@@ -10,7 +10,7 @@
 var SHEET_ID      = '1dbMhoFuINB-boqITMExPw9cH_MIrJ4wpqQjwjGcX8S4';
 var NOTIF_EMAIL   = 'djceservicesforyou@gmail.com';
 var BUSINESS_NAME = 'DJ-CE Air-conditioning Services';
-var BUSINESS_PHONE = '0976 259 2458';
+var BUSINESS_PHONE = '0967 004 2636';
 var BUSINESS_ADDRESS = 'Caniogan, Calumpit, Bulacan';
 var TIMEZONE      = 'Asia/Manila';
 
