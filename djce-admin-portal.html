@@ -683,7 +683,7 @@ tr:hover td { background:var(--bg-elev2); }
             <div class="feat-item"><span class="ic">🛡️</span> Warranty & Complaint Tracker</div>
           </div>
         </div>
-        <div class="ll-copy">© 2025 DJ-CE Air-conditioning Services · Calumpit, Bulacan</div>
+        <div class="ll-copy">© 2022 DJ-CE Air-conditioning Services · Calumpit, Bulacan</div>
       </div>
 
       <div class="login-right">
@@ -6224,7 +6224,7 @@ function buildRevenueContent(from, to) {
 
   <!-- Payslip generator -->
   <div class="panel">
-    <div class="panel-head"><div class="panel-title">📄 Payslip Generator</div>${(CUR_USER.role==='owner'||CUR_USER.role==='admin')?'<button class="btn btn-outline btn-xs" onclick="openEditTeamNames()" style="margin-left:auto">✏️ Edit Names</button>':''}</div>
+    <div class="panel-head"><div class="panel-title">📄 Payslip Generator</div>${(CUR_USER&&(CUR_USER.role==='owner'||CUR_USER.role==='admin'))?'<button class="btn btn-outline btn-xs" onclick="openEditTeamNames()" style="margin-left:auto">✏️ Edit Names</button>':''}</div>
     <div class="panel-body">
       <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px">Generate BIR-friendly payslips for the team. All fields are editable before printing.</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
@@ -11182,7 +11182,7 @@ function saveCommLog() {
 
 /* ===== SETTINGS & ACCOUNTS ===== */
 function renderSettings(){
-  const me = USERS[session.username];
+  const me = USERS[session.username] || {};
   const isOwner = session.role === 'owner';
   const now = new Date();
   const lastChange = me.lastPwChange ? new Date(me.lastPwChange) : null;
