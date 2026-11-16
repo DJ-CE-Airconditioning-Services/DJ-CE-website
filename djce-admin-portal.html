@@ -3579,7 +3579,7 @@ function renderClientRows(clients) {
     return '<tr'+(bl?' style="background:rgba(220,38,38,0.06)"':'')+'>' +
       '<td><strong>'+escH(c.name)+'</strong>'+(bl?renderBlacklistBadge(c.name,c.phone):'')+(c.email?'<div style="font-size:10.5px;color:var(--text-dim)">'+escH(c.email)+'</div>':'')+'</td>' +
       '<td>'+(c.phone||'—')+'</td>' +
-      '<td style="font-size:12px;max-width:200px;word-wrap:break-word;white-space:normal">'+(c.address||'—')+(c.landmark?'<div style="font-size:10.5px;color:var(--text-dim)">📍 '+escH(c.landmark)+'</div>':'')+'</td>' +
+      '<td style="font-size:12px;max-width:220px;word-wrap:break-word;white-space:normal">'+(c.address||'—')+(c.landmark?'<div style="font-size:10.5px;color:var(--gold);margin-top:3px"><strong>📍 Landmark:</strong> '+escH(c.landmark)+'</div>':'')+ renderLocationBadges(c.locationInfo)+'</td>' +
       '<td style="font-size:12px">'+formatDate(c.lastServiceDate)+'<div style="font-size:10.5px;color:var(--text-dim)">'+(c.lastService||'—')+'</div></td>' +
       '<td style="font-size:11.5px">'+(c.usage||'<span style="color:var(--text-dim)">Not set</span>')+'</td>' +
       '<td style="font-size:12px">'+(next?formatDate(c.nextCleaningDate):'—')+'</td>' +
