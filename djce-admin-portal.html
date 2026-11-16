@@ -1113,7 +1113,12 @@ function _applySheetAccounts(res) {
         if (acc.avatar) USERS[u].avatar = acc.avatar;
         if (acc.lastPwChange) USERS[u].lastPwChange = acc.lastPwChange;
         if (acc.forceChange !== undefined) USERS[u].forceChange = (acc.forceChange === 'true' || acc.forceChange === true);
-        if (acc.pin) USERS[u].pin = acc.pin;
+        // PIN: sync even when empty/cleared on another device
+        if (acc.hasOwnProperty('pin')) {
+          USERS[u].pin = (acc.pin === '__CLEAR__' || !acc.pin) ? '' : acc.pin;
+          // Also clear leftover localStorage PIN when cleared remotely
+          if (!USERS[u].pin) try { localStorage.removeItem('djce_pin_'+u); } catch(e){}
+        }
       }
     });
     saveAccounts();
@@ -11175,6 +11180,14 @@ function changeMyPassword(){
   USERS[session.username].forceChange=false;
   saveAccounts();
   syncAccountToSheets({username:session.username, password:np, lastPwChange:USERS[session.username].lastPwChange, forceChange:false});
+  // Update remembered credentials if saved
+  try {
+    var rem = JSON.parse(localStorage.getItem('djce_remember')||'null');
+    if (rem && rem.username === session.username) {
+      rem.password = np;
+      localStorage.setItem('djce_remember', JSON.stringify(rem));
+    }
+  } catch(e){}
   logActivity('🔑',session.name+' changed password','settings');
   showToast('Password changed successfully! ✅','success');
   switchView('settings');
@@ -11202,6 +11215,14 @@ function submitForcedPw(){
   USERS[session.username].forceChange=false;
   saveAccounts();
   syncAccountToSheets({username:session.username, password:np, lastPwChange:USERS[session.username].lastPwChange, forceChange:false});
+  // Update remembered credentials if saved
+  try {
+    var rem = JSON.parse(localStorage.getItem('djce_remember')||'null');
+    if (rem && rem.username === session.username) {
+      rem.password = np;
+      localStorage.setItem('djce_remember', JSON.stringify(rem));
+    }
+  } catch(e){}
   logActivity('🔑',session.name+' set new password (forced)','auth');
   document.getElementById('forcedPwScreen').style.display='none';
   showToast('Password updated! 🎉','success');
@@ -11450,11 +11471,14 @@ document.addEventListener('click', function(e){
 
 /* ── Reset PIN (admin action) ── */
 function resetUserPin(username) {
-  var hasPin = false;
-  try { hasPin = !!localStorage.getItem('djce_pin_'+username); } catch(e){}
+  var hasPin = (USERS[username] && USERS[username].pin) || false;
+  try { hasPin = hasPin || !!localStorage.getItem('djce_pin_'+username); } catch(e){}
   if (!hasPin) { showToast('No PIN set for '+username,'info'); return; }
   if (!confirm('Reset PIN lock for "'+username+'"? They will need to set up a new PIN.')) return;
+  // Clear from USERS, localStorage, and sync to Sheets
+  if (USERS[username]) { USERS[username].pin = ''; saveAccounts(); }
   try { localStorage.removeItem('djce_pin_'+username); } catch(e){}
+  syncAccountToSheets({ username: username, pin: '__CLEAR__' });
   showToast('PIN reset for '+username,'success');
   renderAccountsManager();
 }
@@ -11593,7 +11617,8 @@ function clearPin() {
   if (session && USERS[session.username]) {
     USERS[session.username].pin = '';
     saveAccounts();
-    syncAccountToSheets({ username: session.username, pin: '' });
+    // Send __CLEAR__ marker so backend always writes the empty value
+    syncAccountToSheets({ username: session.username, pin: '__CLEAR__' });
   }
   try { localStorage.removeItem(getPinKey()); } catch(e){}
 }
