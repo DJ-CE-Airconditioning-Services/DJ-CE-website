@@ -148,8 +148,6 @@ function doGet(e) {
         case 'getWaitlist':         result = getWaitlist(params);         break;
         case 'updateWaitlist':      result = updateWaitlist(params);      break;
         case 'deleteWaitlist':      result = deleteWaitlist(params);      break;
-        case 'getPortalConfig':     result = getPortalConfig();           break;
-        case 'savePortalConfig':    result = savePortalConfig(params);    break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -2032,44 +2030,3 @@ function deleteWaitlist(p) {
   return { ok: false, error: 'Not found' };
 }
 
-/* ─── Portal Config (key-value settings synced across devices) ─── */
-
-function getPortalConfig() {
-  var sheet = getOrCreateSheet('PortalConfig');
-  var rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return { ok: true, config: {} };
-  var config = {};
-  for (var i = 1; i < rows.length; i++) {
-    var key = String(rows[i][0]);
-    var val = String(rows[i][1]);
-    if (key) {
-      try { config[key] = JSON.parse(val); } catch(e) { config[key] = val; }
-    }
-  }
-  return { ok: true, config: config };
-}
-
-function savePortalConfig(p) {
-  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
-  var key = data.key;
-  var value = data.value;
-  if (!key) return { ok: false, error: 'No key' };
-  var valStr = typeof value === 'string' ? value : JSON.stringify(value);
-  var sheet = getOrCreateSheet('PortalConfig');
-  var rows = sheet.getDataRange().getValues();
-  // Create headers if empty
-  if (rows.length === 0) {
-    sheet.appendRow(['Key', 'Value', 'Updated']);
-    rows = [['Key', 'Value', 'Updated']];
-  }
-  // Update existing or append
-  for (var i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === key) {
-      sheet.getRange(i + 1, 2).setValue(valStr);
-      sheet.getRange(i + 1, 3).setValue(now());
-      return { ok: true, action: 'updated' };
-    }
-  }
-  sheet.appendRow([key, valStr, now()]);
-  return { ok: true, action: 'created' };
-}
