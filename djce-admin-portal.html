@@ -3658,9 +3658,9 @@ async function openNewSlot() {
       const body = document.getElementById('slotListBody');
       if (body) body.innerHTML = buildSlotListHtml();
     } else {
-      showToast('Failed to open slot'+(res&&res.error?': '+res.error:''),'error');
+      showToast('Failed to open slot'+(res&&res.error?': '+res.error:'')+' — tap to retry','error',6000);
     }
-  } catch(e) { showToast('Error: '+e.message,'error'); }
+  } catch(e) { showToast('Error: '+e.message+' — tap to retry','error',6000); }
 }
 
 async function openWeekSlots() {
@@ -9136,39 +9136,60 @@ function loadLocalData() {
 =========================== */
 /* ─── GOOGLE SHEETS SYNC ENGINE ─────────────────────────── */
 
-function callSheets(params, timeout, _noCookies) {
-  timeout = timeout || 15000;
-  return new Promise(function(resolve) {
+function callSheets(params, timeout, _retryMode) {
+  timeout = timeout || 20000;
+  var query = Object.keys(params).map(function(k){
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+  }).join('&');
+
+  // Try fetch first (works better on mobile / PWA), then JSONP fallback
+  function viaFetch() {
     var cb = 'djceCb' + Date.now() + Math.floor(Math.random()*9999);
-    var s = document.createElement('script');
-    var query = Object.keys(params).map(function(k){
-      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-    }).join('&');
-    s.src = APPS_SCRIPT_URL + '?' + query + '&cb=' + cb;
-    // Retry mode: send request WITHOUT Google account cookies (fixes phones with multiple/signed-in Google accounts)
-    if (_noCookies) s.crossOrigin = 'anonymous';
-    var done = false;
-    window[cb] = function(data) {
-      if (done) return; done = true;
-      delete window[cb]; s.remove(); resolve(data);
-    };
-    s.onerror = function() {
-      if (done) return; done = true;
-      delete window[cb]; s.remove();
-      if (!_noCookies) {
-        // First try failed before reaching the script — retry once without cookies
-        callSheets(params, timeout, true).then(resolve);
-      } else {
-        resolve({ ok: false, error: 'Network error' });
-      }
-    };
-    document.head.appendChild(s);
-    setTimeout(function() {
-      if (done) return; done = true;
-      try { delete window[cb]; s.remove(); } catch(e) {}
-      resolve({ ok: false, error: 'Timeout' });
-    }, timeout);
-  });
+    var url = APPS_SCRIPT_URL + '?' + query + '&cb=' + cb;
+    var ctrl = new AbortController();
+    var timer = setTimeout(function(){ ctrl.abort(); }, timeout);
+    return fetch(url, { redirect:'follow', signal: ctrl.signal })
+      .then(function(r){ clearTimeout(timer); return r.text(); })
+      .then(function(txt){
+        // Strip JSONP wrapper: callbackName({...})
+        var json = txt.replace(/^[^(]*\(/, '').replace(/\);?\s*$/, '');
+        return JSON.parse(json);
+      });
+  }
+
+  function viaJSONP(noCookies) {
+    return new Promise(function(resolve) {
+      var cb = 'djceCb' + Date.now() + Math.floor(Math.random()*9999);
+      var s = document.createElement('script');
+      s.src = APPS_SCRIPT_URL + '?' + query + '&cb=' + cb;
+      if (noCookies) s.crossOrigin = 'anonymous';
+      var done = false;
+      window[cb] = function(data) {
+        if (done) return; done = true;
+        delete window[cb]; s.remove(); resolve(data);
+      };
+      s.onerror = function() {
+        if (done) return; done = true;
+        delete window[cb]; s.remove();
+        if (!noCookies) {
+          viaJSONP(true).then(resolve);
+        } else {
+          resolve({ ok: false, error: 'Network error' });
+        }
+      };
+      document.head.appendChild(s);
+      setTimeout(function() {
+        if (done) return; done = true;
+        try { delete window[cb]; s.remove(); } catch(e) {}
+        resolve({ ok: false, error: 'Timeout' });
+      }, timeout);
+    });
+  }
+
+  // _retryMode: 0=try fetch→jsonp, 1=jsonp only, 2=jsonp noCookies
+  if (_retryMode === 1) return viaJSONP(false);
+  if (_retryMode === 2) return viaJSONP(true);
+  return viaFetch().catch(function(){ return viaJSONP(false); });
 }
 
 async function fetchFromSheets() {
