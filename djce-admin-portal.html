@@ -2746,6 +2746,19 @@ function onSvcTypeChange(idx){
   if(det) det.innerHTML=buildSvcDetailFields(idx, _svcEntries[idx].type||'');
 }
 
+function showMonthsAway(input, lblId){
+  var lbl=document.getElementById(lblId);
+  if(!lbl)return;
+  if(!input.value){lbl.textContent='';return;}
+  var picked=new Date(input.value+'T00:00:00');
+  var now=new Date();
+  var diff=(picked.getFullYear()-now.getFullYear())*12+(picked.getMonth()-now.getMonth());
+  var days=Math.round((picked-now)/(1000*60*60*24));
+  if(days<0){lbl.textContent='⚠️ Past date';lbl.style.color='var(--danger)';}
+  else if(diff<1){lbl.textContent='≈ '+days+' days from now';lbl.style.color='var(--gold)';}
+  else{lbl.textContent='≈ '+diff+' month'+(diff!==1?'s':'')+' from now';lbl.style.color='var(--gold)';}
+}
+
 function buildSvcDetailFields(idx, svc){
   if(!svc) return '';
   var p='svc_'+idx+'_';
@@ -2759,7 +2772,7 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>HP *</label>'+hp+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
-      '<div class="field"><label>Next Cleaning</label><select id="'+p+'nextcycle"><option value="">— Set follow-up —</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">1 year</option></select></div>'+
+      '<div class="field"><label>Next Cleaning</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"><div id="'+p+'nextlbl" style="font-size:10px;color:var(--gold);margin-top:3px"></div></div>'+
     '</div>';
   }
   if(svc==='Aircon Installation'){
@@ -2776,7 +2789,7 @@ function buildSvcDetailFields(idx, svc){
     return '<div class="form-grid" style="margin-top:6px">'+
       '<div class="field"><label>Brand</label>'+wmBrands+'</div>'+
       '<div class="field"><label>Capacity</label>'+wmCap+'</div>'+
-      '<div class="field"><label>Next Deep Clean</label><select id="'+p+'nextcycle"><option value="">— Set follow-up —</option><option value="6">6 months</option><option value="12">1 year</option></select></div>'+
+      '<div class="field"><label>Next Deep Clean</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"><div id="'+p+'nextlbl" style="font-size:10px;color:var(--gold);margin-top:3px"></div></div>'+
     '</div>';
   }
   if(svc==='Electrical Works'||svc==='Plumbing'){
@@ -2796,7 +2809,7 @@ function getServiceDetails() {
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
     var item={service:svc, brand:pick('brand'), hp:pick('hp'), actype:pick('actype'),
-      floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextcycle:pick('nextcycle')};
+      floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate')};
     entries.push(item);
     var pts=[svc];
     if(item.actype)pts.push(item.actype);
@@ -2918,14 +2931,11 @@ async function saveBooking() {
   // Generate proper reference number
   const refNo = await generateRefNumber('BK', svcCode);
   const id = refNo; // USE refNo as the booking ID
-  // Calculate next cleaning from service entries with nextcycle
+  // Calculate next cleaning from service entries — use exact date picked by user
   var earliestNext = '';
   validSvc.forEach(function(e){
-    if(e.nextcycle && date){
-      var d=new Date(date);
-      d.setMonth(d.getMonth()+parseInt(e.nextcycle));
-      var ns=d.toISOString().split('T')[0];
-      if(!earliestNext||ns<earliestNext) earliestNext=ns;
+    if(e.nextdate){
+      if(!earliestNext||e.nextdate<earliestNext) earliestNext=e.nextdate;
     }
   });
   BOOKINGS[id] = {
