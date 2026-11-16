@@ -1250,7 +1250,14 @@ const SECURITY_QUESTIONS = [
   'What is the name of your best friend?'
 ];
 
-const TECHNICIANS = ['Papa (Senior Tech)', 'Helper 1', 'Helper 2'];
+function getTechnicians(){
+  var techRoles = ['tech','sr_tech','jr_tech','helper','driver'];
+  var list = [];
+  Object.values(USERS).forEach(function(u){
+    if(u && u.name && techRoles.indexOf(u.role)!==-1) list.push(u.name);
+  });
+  return list.length ? list : ['Papa (Senior Tech)', 'Helper 1', 'Helper 2'];
+}
 
 // Reference number service codes
 const SERVICE_CODES = {
@@ -2422,7 +2429,7 @@ function openBookingDetail(id) {
     <div class="sec-divider" style="margin-top:16px">Update Booking</div>
     <div class="form-grid">
       <div class="field"><label>Assign Technician</label>
-        <select id="detTech"><option value="">— Select —</option>${TECHNICIANS.map(t=>`<option ${b.technician===t?'selected':''}>${t}</option>`).join('')}</select>
+        <select id="detTech"><option value="">— Select —</option>${getTechnicians().map(t=>`<option ${b.technician===t?'selected':''}>${t}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Status</label>
         <select id="detStatus">
@@ -2841,7 +2848,7 @@ function openNewBooking(name='',phone='',address='') {
         <input type="time" id="nb_time_custom" style="display:none;margin-top:5px" onchange="this.dataset.set='1'">
       </div>
       <div class="field"><label>Assign Technician</label>
-        <select id="nb_tech"><option value="">— To be assigned —</option>${TECHNICIANS.map(t=>`<option>${t}</option>`).join('')}</select>
+        <select id="nb_tech"><option value="">— To be assigned —</option>${getTechnicians().map(t=>`<option>${t}</option>`).join('')}</select>
       </div>
       <div class="field"><label>⭐ Service Tier</label>
         <select id="nb_tier" onchange="updateTierBadge()"><option value="Normal">🟢 Normal</option><option value="VIP">⭐ VIP (+ additional fee)</option><option value="Rush">🔴 Rush (+ rush fee)</option></select>
@@ -2973,7 +2980,7 @@ function renderJobs() {
   const active = jobsActiveTab;
   const activeBks = tabData[active]||[];
 
-  const techOptions = TECHNICIANS.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const techOptions = getTechnicians().map(t=>`<option value="${t}">${t}</option>`).join('');
 
   // Stats row
   const statsHtml = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));margin-bottom:18px">
@@ -4446,7 +4453,7 @@ function openNewComplaint() {
     </div>
     <div id="cmp_techFields" style="display:none">
       <div class="field"><label>🔧 Technician Name *</label>
-        <select id="cmp_techName"><option value="">— Select Technician —</option>${TECHNICIANS.map(function(t){return '<option>'+t+'</option>';}).join('')}</select>
+        <select id="cmp_techName"><option value="">— Select Technician —</option>${getTechnicians().map(function(t){return '<option>'+t+'</option>';}).join('')}</select>
       </div>
       <div class="field"><label>About / Against</label>
         <select id="cmp_aboutType" onchange="toggleComplaintAbout()">
