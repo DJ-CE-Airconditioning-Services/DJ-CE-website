@@ -3635,56 +3635,42 @@ function renderSchedule() {
 
     <!-- TAB 2: Slot Management (Owner/Admin only) -->
     ${isOwnerAdmin ? `<div id="tabSlots" style="display:none">
-      <div class="panel" style="margin-bottom:16px">
-        <div class="panel-head">
-          <div class="panel-title">🗓️ Open New Slots</div>
-        </div>
-        <div class="panel-body">
-          <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:16px">
-            Open available dates for clients to book. Once open, the date + time slot will appear on the booking form.
-          </div>
-          <div class="form-grid" style="align-items:end">
-            <div class="field">
-              <label>Date</label>
-              <input type="date" id="slotDate" min="${todayStr}" value="${todayStr}"
-                style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <!-- LEFT: Calendar -->
+        <div style="flex:1;min-width:300px;">
+          <div class="panel" style="margin-bottom:16px;">
+            <div class="panel-head">
+              <div class="panel-title">🗓️ Slot Calendar</div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-outline btn-xs" onclick="slotCalNavPrev()">◀</button>
+                <span id="slotCalMonthLabel" style="font-size:13px;font-weight:700;color:var(--accent);min-width:140px;text-align:center;line-height:28px;"></span>
+                <button class="btn btn-outline btn-xs" onclick="slotCalNavNext()">▶</button>
+              </div>
             </div>
-            <div class="field">
-              <label>Start Time</label>
-              <input type="time" id="slotStartTime" value="09:00"
-                style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
-            </div>
-            <div class="field">
-              <label>End Time</label>
-              <input type="time" id="slotEndTime" value="12:00"
-                style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
-            </div>
-            <div class="field">
-              <label>Max Bookings for this slot</label>
-              <input type="number" id="slotMax" value="2" min="1" max="20"
-                style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
-            </div>
-            <div class="field">
-              <label>Notes (optional)</label>
-              <input type="text" id="slotNotes" placeholder="e.g. Papa only"
-                style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+            <div class="panel-body" id="slotCalendarGrid" style="padding:10px 14px;"></div>
+            <!-- Legend -->
+            <div style="display:flex;gap:12px;justify-content:center;padding:8px 14px 14px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);"><div style="width:10px;height:10px;border-radius:3px;background:var(--success);"></div> Has slots</div>
+              <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);"><div style="width:10px;height:10px;border-radius:3px;background:var(--danger);"></div> Full</div>
+              <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);"><div style="width:10px;height:10px;border-radius:3px;background:var(--border);"></div> No slots</div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-            <button class="btn btn-gold btn-sm" onclick="openNewSlot()">✅ Open This Slot</button>
-            <button class="btn btn-outline btn-sm" onclick="openWeekSlots()">📅 Open Entire Week</button>
+          <!-- Summary Stats -->
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">📊 Week Summary</div></div>
+            <div class="panel-body" id="slotSummaryBody" style="padding:12px 14px;">${buildSlotSummaryHtml()}</div>
           </div>
         </div>
-      </div>
-
-      <!-- Slot list -->
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">📋 All Open Slots</div>
-          <button class="btn btn-outline btn-sm" onclick="refreshSlots()">🔄 Refresh</button>
-        </div>
-        <div class="panel-body" id="slotListBody">
-          ${buildSlotListHtml()}
+        <!-- RIGHT: Side Panel (date detail + form) -->
+        <div style="flex:1;min-width:300px;max-width:420px;">
+          <div class="panel" id="slotSidePanel">
+            <div class="panel-head">
+              <div class="panel-title" id="slotSidePanelTitle">📅 Select a Date</div>
+            </div>
+            <div class="panel-body" id="slotSidePanelBody" style="padding:14px;">
+              <div class="empty" style="padding:30px 10px;"><div class="empty-ic">👈</div><p>Click a date sa calendar para mag-open o mag-edit ng slots.</p></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>` : ''}
@@ -3698,62 +3684,292 @@ function switchSchedTab(tab) {
   document.getElementById('tabBtnSchedule').classList.toggle('active', tab==='schedule');
   const slotBtn = document.getElementById('tabBtnSlots');
   if (slotBtn) slotBtn.classList.toggle('active', tab==='slots');
+  if (tab==='slots') { renderSlotCalendar(); var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml(); }
 }
 
-function buildSlotListHtml() {
-  const today = new Date().toISOString().split('T')[0];
-  const slots = SCHEDULE_SLOTS.filter(s => s.date >= today)
-    .sort((a,b) => a.date!==b.date ? a.date.localeCompare(b.date) : (a.timeSlot||'').localeCompare(b.timeSlot||''));
+// ── Slot Calendar State ──
+var _slotCalMonth = new Date().getMonth();
+var _slotCalYear = new Date().getFullYear();
+var _slotCalSelectedDate = '';
 
-  if (!slots.length) {
-    return '<div class="empty"><div class="empty-ic">🗓️</div><p>No open slots. Use the form above to open dates for booking.</p></div>';
+function slotCalNavPrev(){ _slotCalMonth--; if(_slotCalMonth<0){_slotCalMonth=11;_slotCalYear--;} renderSlotCalendar(); }
+function slotCalNavNext(){ _slotCalMonth++; if(_slotCalMonth>11){_slotCalMonth=0;_slotCalYear++;} renderSlotCalendar(); }
+
+function renderSlotCalendar(){
+  var monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dayHeaders=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var label=document.getElementById('slotCalMonthLabel');
+  if(label) label.textContent=monthNames[_slotCalMonth]+' '+_slotCalYear;
+  var grid=document.getElementById('slotCalendarGrid');
+  if(!grid) return;
+  var today=new Date(); today.setHours(0,0,0,0);
+  var todayStr=today.toISOString().split('T')[0];
+  var firstDay=new Date(_slotCalYear,_slotCalMonth,1).getDay();
+  var daysInMonth=new Date(_slotCalYear,_slotCalMonth+1,0).getDate();
+
+  // Build slot lookup by date
+  var slotsByDate={};
+  SCHEDULE_SLOTS.forEach(function(s){
+    var d=s.date; if(d&&d.length>10) d=d.substring(0,10);
+    if(!slotsByDate[d]) slotsByDate[d]=[];
+    slotsByDate[d].push(s);
+  });
+
+  var html='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;">';
+  dayHeaders.forEach(function(dh){
+    html+='<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;padding:4px 0;">'+dh+'</div>';
+  });
+  html+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+  for(var e=0;e<firstDay;e++) html+='<div></div>';
+
+  for(var day=1;day<=daysInMonth;day++){
+    var dateStr=_slotCalYear+'-'+String(_slotCalMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    var isPast=dateStr<todayStr;
+    var isToday=dateStr===todayStr;
+    var isSelected=dateStr===_slotCalSelectedDate;
+    var daySlots=slotsByDate[dateStr]||[];
+    var openSlots=daySlots.filter(function(s){return s.status==='Open'&&s.remaining>0;});
+    var fullSlots=daySlots.filter(function(s){return s.status==='Full'||s.remaining<=0;});
+    var totalSlots=daySlots.length;
+    var hasOpen=openSlots.length>0;
+    var hasFull=fullSlots.length>0&&openSlots.length===0;
+
+    var bg,border,textCol,cursor;
+    if(isSelected){bg='var(--accent)';border='var(--accent)';textCol='#0d1f3c';cursor='pointer';}
+    else if(isPast){bg='transparent';border='transparent';textCol='var(--text-dim)';cursor='default';}
+    else if(hasOpen){bg='rgba(16,185,129,0.12)';border='rgba(16,185,129,0.35)';textCol='#fff';cursor='pointer';}
+    else if(hasFull){bg='rgba(239,68,68,0.1)';border='rgba(239,68,68,0.3)';textCol='rgba(255,255,255,0.5)';cursor='pointer';}
+    else{bg='var(--bg-elev2)';border='var(--border)';textCol='var(--text)';cursor='pointer';}
+
+    var todayRing=isToday?'box-shadow:0 0 0 2px var(--accent) inset;':'';
+    var dot='';
+    if(hasOpen) dot='<div style="width:5px;height:5px;border-radius:50%;background:var(--success);margin:2px auto 0;"></div>';
+    else if(hasFull) dot='<div style="width:5px;height:5px;border-radius:50%;background:var(--danger);margin:2px auto 0;"></div>';
+
+    var slotCount=totalSlots>0?'<div style="font-size:8px;font-weight:700;color:'+(isSelected?'#0d1f3c':'var(--text-dim)')+';margin-top:1px;">'+totalSlots+'</div>':'';
+
+    html+='<button type="button" data-date="'+dateStr+'" onclick="selectSlotCalDate(\''+dateStr+'\')" '
+      +'style="padding:5px 2px;border:1.5px solid '+border+';border-radius:8px;background:'+bg+';'
+      +'cursor:'+cursor+';text-align:center;min-height:44px;transition:all .15s;'+todayRing+'">'
+      +'<div style="font-size:13px;font-weight:700;color:'+textCol+';">'+day+'</div>'
+      +dot+slotCount
+      +(isToday?'<div style="font-size:7px;font-weight:800;color:var(--accent);margin-top:1px;">TODAY</div>':'')
+      +'</button>';
+  }
+  html+='</div>';
+  grid.innerHTML=html;
+}
+
+function selectSlotCalDate(dateStr){
+  _slotCalSelectedDate=dateStr;
+  renderSlotCalendar();
+  renderSlotSidePanel(dateStr);
+}
+
+function renderSlotSidePanel(dateStr){
+  var title=document.getElementById('slotSidePanelTitle');
+  var body=document.getElementById('slotSidePanelBody');
+  if(!title||!body) return;
+  var d=new Date(dateStr+'T00:00:00');
+  var dateLabel=d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  title.innerHTML='📅 '+dateLabel;
+
+  // Get existing slots for this date
+  var daySlots=SCHEDULE_SLOTS.filter(function(s){
+    var sd=s.date; if(sd&&sd.length>10) sd=sd.substring(0,10);
+    return sd===dateStr;
+  }).sort(function(a,b){return (a.timeSlot||'').localeCompare(b.timeSlot||'');});
+
+  // Check area schedule
+  var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dayName=dayNames[d.getDay()];
+  var areasForDay=[];
+  var areaKeys=Object.keys(AREA_SCHEDULE);
+  for(var i=0;i<areaKeys.length;i++){
+    if(AREA_SCHEDULE[areaKeys[i]].indexOf(dayName)!==-1) areasForDay.push(areaKeys[i]);
   }
 
-  // Normalize dates — strip time portion if present (e.g. "2026-10-05 00:00:00" → "2026-10-05")
-  slots.forEach(s => { if (s.date && s.date.length > 10) s.date = s.date.substring(0,10); });
+  var html='';
 
-  // Group by date
-  const byDate = {};
-  slots.forEach(s => { if (!byDate[s.date]) byDate[s.date]=[]; byDate[s.date].push(s); });
+  // Area schedule info
+  if(areasForDay.length){
+    html+='<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:3px;">📍 '+dayName+' Areas</div>'
+      +'<div style="font-size:12px;color:var(--text-dim);line-height:1.5;">'+areasForDay.join(', ')+'</div></div>';
+  }
 
-  return Object.keys(byDate).sort().map(function(date) {
-    const isToday = date === today;
-    const dateLabel = new Date(date+'T00:00:00').toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
-    const daySlots = byDate[date].map(function(s) {
-      const pct = s.maxBookings>0 ? Math.round((s.currentBookings/s.maxBookings)*100) : 0;
-      const isFull = s.status==='Full' || s.remaining<=0;
-      const isClosed = s.status==='Closed';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-elev2);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">'
-        +'<div style="font-size:20px">🕐</div>'
-        +'<div style="flex:1">'
-          +'<div style="font-size:13px;font-weight:700;color:var(--accent)">'+(s.label||s.timeSlot)+' · <span style="font-weight:400;color:var(--text-dim);font-size:12px">'+(s.time||s.timeSlot)+'</span></div>'
-          +'<div style="display:flex;align-items:center;gap:8px;margin-top:4px">'
-            +'<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;max-width:120px"><div style="height:100%;width:'+pct+'%;background:'+(isFull?'var(--danger)':'var(--success)')+';border-radius:3px"></div></div>'
-            +'<span style="font-size:11.5px;color:var(--text-dim)">'+s.currentBookings+'/'+s.maxBookings+' booked'+(s.notes?' · '+s.notes:'')+'</span>'
-          +'</div>'
+  // Existing slots for this date
+  if(daySlots.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Existing Slots ('+daySlots.length+')</div>';
+    daySlots.forEach(function(s){
+      var pct=s.maxBookings>0?Math.round((s.currentBookings/s.maxBookings)*100):0;
+      var isFull=s.status==='Full'||s.remaining<=0;
+      var isClosed=s.status==='Closed';
+      var statusColor=isFull?'var(--danger)':isClosed?'var(--text-dim)':'var(--success)';
+      var statusBg=isFull?'var(--danger-soft)':isClosed?'var(--border)':'var(--success-soft)';
+      html+='<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+          +'<div style="font-size:13px;font-weight:700;color:var(--accent);">🕐 '+(s.label||s.timeSlot)+'</div>'
+          +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+statusBg+';color:'+statusColor+';">'+s.status+'</span>'
         +'</div>'
-        +'<div style="display:flex;gap:6px;align-items:center">'
-          +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:'
-            +(isFull?'var(--danger-soft)':isClosed?'var(--border)':'var(--success-soft)')
-            +';color:'+(isFull?'var(--danger)':isClosed?'var(--text-dim)':'var(--success)')+'">'+s.status+'</span>'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+          +'<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;max-width:120px;"><div style="height:100%;width:'+pct+'%;background:'+(isFull?'var(--danger)':'var(--success)')+';border-radius:3px;"></div></div>'
+          +'<span style="font-size:11px;color:var(--text-dim);">'+s.currentBookings+'/'+s.maxBookings+' booked'+(s.notes?' · '+s.notes:'')+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:5px;flex-wrap:wrap;">'
+          +'<button class="btn btn-outline btn-xs" onclick="openEditSlotModal(\''+s.slotId+'\')">✏️ Edit</button>'
           +(isClosed
-            ? '<button class="btn btn-success btn-xs" data-sid="'+s.slotId+'" onclick="reopenSlot(this.dataset.sid)">↩️ Reopen</button>'
-            : '<button class="btn btn-outline btn-xs" data-sid="'+s.slotId+'" onclick="toggleSlotClose(this.dataset.sid)">🔒 Close</button>')
-          +'<button class="btn btn-danger btn-xs" data-sid="'+s.slotId+'" onclick="removeSlot(this.dataset.sid)">🗑️</button>'
+            ?'<button class="btn btn-success btn-xs" onclick="reopenSlot(\''+s.slotId+'\')">↩️ Reopen</button>'
+            :'<button class="btn btn-outline btn-xs" onclick="toggleSlotClose(\''+s.slotId+'\')">🔒 Close</button>')
+          +'<button class="btn btn-danger btn-xs" onclick="removeSlot(\''+s.slotId+'\')">🗑️</button>'
         +'</div>'
-        +'</div>';
-    }).join('');
-
-    return '<div style="margin-bottom:16px">'
-      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-        +'<div style="flex:1;height:1px;background:var(--border)"></div>'
-        +'<div style="font-size:12px;font-weight:700;white-space:nowrap;'+(isToday?'background:var(--accent);color:#0d1f3c;padding:3px 12px;border-radius:20px;':'color:var(--accent)')+'">'+dateLabel+(isToday?' · TODAY':'')+'</div>'
-        +'<div style="flex:1;height:1px;background:var(--border)"></div>'
-      +'</div>'
-      +daySlots
       +'</div>';
-  }).join('');
+    });
+  } else {
+    html+='<div style="text-align:center;padding:16px 0;color:var(--text-dim);font-size:12.5px;">Walang open slots para sa date na ito.</div>';
+  }
+
+  // Add New Slot form
+  html+='<div style="border-top:1.5px solid var(--border);margin-top:12px;padding-top:14px;">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">➕ Add New Slot</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+      +'<div class="field"><label style="font-size:11px;">Start Time</label>'
+        +'<input type="time" id="slotStartTime" value="09:00" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;"></div>'
+      +'<div class="field"><label style="font-size:11px;">End Time</label>'
+        +'<input type="time" id="slotEndTime" value="12:00" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'
+      +'<div class="field"><label style="font-size:11px;">Max Bookings</label>'
+        +'<input type="number" id="slotMax" value="2" min="1" max="20" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;"></div>'
+      +'<div class="field"><label style="font-size:11px;">Notes</label>'
+        +'<input type="text" id="slotNotes" placeholder="e.g. Papa only" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;margin-top:10px;">'
+      +'<button class="btn btn-gold btn-sm" onclick="openNewSlot()" style="flex:1;">✅ Open This Slot</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openWeekSlots()" title="Open 7 days starting from this date">📅 Open Week</button>'
+    +'</div>'
+  +'</div>';
+
+  body.innerHTML=html;
 }
+
+function buildSlotSummaryHtml(){
+  var today=new Date(); today.setHours(0,0,0,0);
+  var todayStr=today.toISOString().split('T')[0];
+  // Get next 7 days with slots
+  var upcoming=[];
+  for(var i=0;i<14;i++){
+    var d=new Date(today); d.setDate(d.getDate()+i);
+    var ds=d.toISOString().split('T')[0];
+    var daySlots=SCHEDULE_SLOTS.filter(function(s){
+      var sd=s.date; if(sd&&sd.length>10) sd=sd.substring(0,10);
+      return sd===ds;
+    });
+    if(daySlots.length||i<7){
+      var openCount=daySlots.filter(function(s){return s.status==='Open'&&s.remaining>0;}).length;
+      var totalBookings=0,totalMax=0,totalHrs=0;
+      daySlots.forEach(function(s){
+        totalBookings+=s.currentBookings||0;
+        totalMax+=s.maxBookings||0;
+        // Parse hours from timeSlot like "9:00 AM – 12:00 PM"
+        var match=(s.timeSlot||'').match(/(\d+):(\d+)\s*(AM|PM)\s*[–-]\s*(\d+):(\d+)\s*(AM|PM)/i);
+        if(match){
+          var h1=parseInt(match[1]),m1=parseInt(match[2]),ap1=match[3].toUpperCase();
+          var h2=parseInt(match[4]),m2=parseInt(match[5]),ap2=match[6].toUpperCase();
+          if(ap1==='PM'&&h1!==12) h1+=12; if(ap1==='AM'&&h1===12) h1=0;
+          if(ap2==='PM'&&h2!==12) h2+=12; if(ap2==='AM'&&h2===12) h2=0;
+          totalHrs+=((h2*60+m2)-(h1*60+m1))/60;
+        }
+      });
+      upcoming.push({date:ds,d:d,slots:daySlots.length,open:openCount,booked:totalBookings,max:totalMax,hrs:totalHrs});
+    }
+  }
+  if(!upcoming.length) return '<div style="text-align:center;color:var(--text-dim);font-size:12px;padding:10px;">No upcoming slots.</div>';
+
+  var html='<div style="display:flex;flex-direction:column;gap:4px;">';
+  upcoming.forEach(function(u){
+    var dayLabel=u.d.toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});
+    var isToday=u.date===todayStr;
+    var barPct=u.max>0?Math.round((u.booked/u.max)*100):0;
+    html+='<div onclick="selectSlotCalDate(\''+u.date+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid '+(isToday?'var(--accent)':'transparent')+';background:'+(isToday?'rgba(245,158,11,0.06)':'transparent')+';transition:all .15s;" onmouseover="this.style.background=\'var(--bg-elev2)\'" onmouseout="this.style.background=\''+(isToday?'rgba(245,158,11,0.06)':'transparent')+'\'">'
+      +'<div style="min-width:85px;font-size:12px;font-weight:'+(isToday?'800':'600')+';color:'+(isToday?'var(--accent)':'var(--text)')+';white-space:nowrap;">'+dayLabel+(isToday?' ⭐':'')+'</div>'
+      +'<div style="flex:1;display:flex;align-items:center;gap:6px;">'
+        +(u.slots?'<div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;max-width:60px;"><div style="height:100%;width:'+barPct+'%;background:'+(barPct>=100?'var(--danger)':'var(--success)')+';border-radius:2px;"></div></div>':'')
+        +'<span style="font-size:11px;color:var(--text-dim);white-space:nowrap;">'
+          +(u.slots?u.slots+' slot'+(u.slots!==1?'s':'')+' · '+u.booked+'/'+u.max+' booked'+(u.hrs?' · '+u.hrs.toFixed(1)+'h':''):'<span style="opacity:.5;">— no slots —</span>')
+        +'</span>'
+      +'</div>'
+    +'</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+// Edit Slot Modal
+function openEditSlotModal(slotId){
+  var s=SCHEDULE_SLOTS.find(function(x){return x.slotId===slotId;});
+  if(!s) return;
+  // Parse existing time from label like "9:00 AM – 12:00 PM" to 24h
+  var startT='09:00',endT='12:00';
+  var match=(s.timeSlot||'').match(/(\d+):(\d+)\s*(AM|PM)\s*[–-]\s*(\d+):(\d+)\s*(AM|PM)/i);
+  if(match){
+    var h1=parseInt(match[1]),m1=match[2],ap1=match[3].toUpperCase();
+    var h2=parseInt(match[4]),m2=match[5],ap2=match[6].toUpperCase();
+    if(ap1==='PM'&&h1!==12) h1+=12; if(ap1==='AM'&&h1===12) h1=0;
+    if(ap2==='PM'&&h2!==12) h2+=12; if(ap2==='AM'&&h2===12) h2=0;
+    startT=String(h1).padStart(2,'0')+':'+m1;
+    endT=String(h2).padStart(2,'0')+':'+m2;
+  }
+  showModal('Edit Slot','✏️ '+s.date+' · '+(s.label||s.timeSlot),
+    '<div class="form-grid">'
+    +'<div class="field"><label>Start Time</label><input type="time" id="editSlotStart" value="'+startT+'"></div>'
+    +'<div class="field"><label>End Time</label><input type="time" id="editSlotEnd" value="'+endT+'"></div>'
+    +'<div class="field"><label>Max Bookings</label><input type="number" id="editSlotMax" value="'+(s.maxBookings||2)+'" min="1" max="20"></div>'
+    +'<div class="field"><label>Notes</label><input type="text" id="editSlotNotes" value="'+(s.notes||'')+'" placeholder="Optional notes"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;">'
+      +'<button class="btn btn-gold btn-sm" onclick="saveEditSlot(\''+slotId+'\')" style="flex:1;">💾 Save Changes</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="closeModal()">Cancel</button>'
+    +'</div>'
+  );
+}
+
+async function saveEditSlot(slotId){
+  var s=SCHEDULE_SLOTS.find(function(x){return x.slotId===slotId;});
+  if(!s) return;
+  var startT=document.getElementById('editSlotStart').value;
+  var endT=document.getElementById('editSlotEnd').value;
+  var max=parseInt(document.getElementById('editSlotMax').value)||2;
+  var notes=document.getElementById('editSlotNotes').value||'';
+  if(!startT||!endT){showToast('Set start and end time','error');return;}
+  if(startT>=endT){showToast('End time must be after start','error');return;}
+  var newLabel=formatTime12(startT)+' – '+formatTime12(endT);
+  showToast('Updating slot...','info');
+  try{
+    // Delete old, create new with same date
+    var res=await callSheets({action:'deleteSlot',data:encodeURIComponent(JSON.stringify({slotId:slotId}))});
+    var res2=await callSheets({action:'openSlot',data:encodeURIComponent(JSON.stringify({
+      date:s.date,timeSlot:newLabel,maxBookings:max,notes:notes,createdBy:session.name
+    }))},15000);
+    if(res2&&res2.ok){
+      s.timeSlot=newLabel;s.label=newLabel;s.time=newLabel;s.maxBookings=max;s.notes=notes;
+      s.remaining=max-(s.currentBookings||0);
+      if(res2.slotId) s.slotId=res2.slotId;
+      showToast('Slot updated! ✅','success');
+      logActivity('✏️','Edited slot: '+s.date+' → '+newLabel+' (max '+max+')','schedule');
+      closeModal();
+      renderSlotSidePanel(_slotCalSelectedDate);
+      renderSlotCalendar();
+      var sumBody=document.getElementById('slotSummaryBody');
+      if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
+    } else {
+      showToast('Failed to update'+(res2&&res2.error?': '+res2.error:''),'error');
+    }
+  }catch(e){showToast('Error: '+e.message,'error');}
+}
+
+// Legacy compat
+function buildSlotListHtml() { return ''; }
 
 function formatTime12(t24) {
   if (!t24) return '';
@@ -3765,12 +3981,13 @@ function formatTime12(t24) {
 }
 
 async function openNewSlot() {
-  const date  = document.getElementById('slotDate')?.value;
+  const date  = _slotCalSelectedDate || document.getElementById('slotDate')?.value;
   const startT = document.getElementById('slotStartTime')?.value;
   const endT   = document.getElementById('slotEndTime')?.value;
   const max   = parseInt(document.getElementById('slotMax')?.value)||2;
   const notes = document.getElementById('slotNotes')?.value||'';
-  if (!date||!startT||!endT) { showToast('Select a date, start time and end time','error'); return; }
+  if (!date) { showToast('Select a date sa calendar muna','error'); return; }
+  if (!startT||!endT) { showToast('Set start and end time','error'); return; }
   if (startT >= endT) { showToast('End time must be after start time','error'); return; }
 
   const timeLabel = formatTime12(startT) + ' – ' + formatTime12(endT);
@@ -3790,8 +4007,9 @@ async function openNewSlot() {
       }
       showToast('Slot opened! ✅','success');
       logActivity('🗓️','Opened slot: '+date+' '+timeLabel+' (max '+max+')','schedule');
-      const body = document.getElementById('slotListBody');
-      if (body) body.innerHTML = buildSlotListHtml();
+      renderSlotCalendar();
+      if(_slotCalSelectedDate) renderSlotSidePanel(_slotCalSelectedDate);
+      var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
     } else {
       showToast('Failed to open slot'+(res&&res.error?': '+res.error:'')+' — tap to retry','error',6000);
     }
@@ -3799,13 +4017,13 @@ async function openNewSlot() {
 }
 
 async function openWeekSlots() {
-  const date  = document.getElementById('slotDate')?.value;
+  const date  = _slotCalSelectedDate || document.getElementById('slotDate')?.value;
   const startT = document.getElementById('slotStartTime')?.value;
   const endT   = document.getElementById('slotEndTime')?.value;
   const max   = parseInt(document.getElementById('slotMax')?.value)||2;
   const notes = document.getElementById('slotNotes')?.value||'';
-  if (!date) { showToast('Select a start date','error'); return; }
-  if (!startT||!endT) { showToast('Select start and end time','error'); return; }
+  if (!date) { showToast('Select a start date sa calendar','error'); return; }
+  if (!startT||!endT) { showToast('Set start and end time','error'); return; }
   if (startT >= endT) { showToast('End time must be after start time','error'); return; }
 
   const timeLabel = formatTime12(startT) + ' – ' + formatTime12(endT);
@@ -3831,8 +4049,15 @@ async function openWeekSlots() {
   }
   showToast('Opened '+opened+' slots for 7 days! ✅','success');
   logActivity('🗓️','Opened week of slots from '+date+' '+timeLabel+' (max '+max+'/slot)','schedule');
-  const body = document.getElementById('slotListBody');
-  if (body) body.innerHTML = buildSlotListHtml();
+  renderSlotCalendar();
+  if(_slotCalSelectedDate) renderSlotSidePanel(_slotCalSelectedDate);
+  var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
+}
+
+function _refreshSlotUI(){
+  renderSlotCalendar();
+  if(_slotCalSelectedDate) renderSlotSidePanel(_slotCalSelectedDate);
+  var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
 }
 
 async function toggleSlotClose(slotId) {
@@ -3843,8 +4068,7 @@ async function toggleSlotClose(slotId) {
     if (res && res.ok) {
       s.status = 'Closed';
       showToast('Slot closed','info');
-      const body = document.getElementById('slotListBody');
-      if (body) body.innerHTML = buildSlotListHtml();
+      _refreshSlotUI();
     }
   } catch(e) { showToast('Error','error'); }
 }
@@ -3860,8 +4084,7 @@ async function reopenSlot(slotId) {
       s.status = 'Open';
       s.remaining = s.maxBookings - s.currentBookings;
       showToast('Slot reopened ✅','success');
-      const body = document.getElementById('slotListBody');
-      if (body) body.innerHTML = buildSlotListHtml();
+      _refreshSlotUI();
     }
   } catch(e) { showToast('Error','error'); }
 }
@@ -3873,8 +4096,7 @@ async function removeSlot(slotId) {
       if (res && res.ok) {
         SCHEDULE_SLOTS = SCHEDULE_SLOTS.filter(s=>s.slotId!==slotId);
         showToast('Slot removed','info');
-        const body = document.getElementById('slotListBody');
-        if (body) body.innerHTML = buildSlotListHtml();
+        _refreshSlotUI();
       }
     } catch(e) { showToast('Error','error'); }
   });
@@ -3887,8 +4109,7 @@ async function refreshSlots() {
     const res = await callSheets({ action:'getAllSlots', from:today });
     if (res && res.ok) {
       SCHEDULE_SLOTS = (res.slots||[]).map(s => { if(s.date&&s.date.length>10) s.date=s.date.substring(0,10); return s; });
-      const body = document.getElementById('slotListBody');
-      if (body) body.innerHTML = buildSlotListHtml();
+      _refreshSlotUI();
       showToast('Slots refreshed ✅','success');
     }
   } catch(e) { showToast('Error refreshing','error'); }
