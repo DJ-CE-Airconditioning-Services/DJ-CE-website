@@ -1119,6 +1119,14 @@ function _applySheetAccounts(res) {
           // Also clear leftover localStorage PIN when cleared remotely
           if (!USERS[u].pin) try { localStorage.removeItem('djce_pin_'+u); } catch(e){}
         }
+        // Permissions: sync from Sheets
+        if (acc.hasOwnProperty('permissions')) {
+          if (typeof acc.permissions === 'string') {
+            try { USERS[u].permissions = JSON.parse(acc.permissions); } catch(e) { USERS[u].permissions = acc.permissions.split(','); }
+          } else if (Array.isArray(acc.permissions)) {
+            USERS[u].permissions = acc.permissions;
+          }
+        }
       }
     });
     saveAccounts();
@@ -1299,6 +1307,107 @@ let NOTIFS = [];
 let currentReceiptBooking = null;
 let ARCHIVED_BOOKINGS = {};
 let EXPENSES = [];
+
+// Permission sections — defines which nav sections can be toggled per account
+var PERMISSION_SECTIONS = [
+  {key:'dashboard',   label:'📊 Dashboard',          group:'Main'},
+  {key:'bookings',    label:'📋 All Bookings',        group:'Main'},
+  {key:'jobs',        label:'🔧 Job Management',      group:'Main'},
+  {key:'clients',     label:'👥 Client Records',      group:'Clients'},
+  {key:'followup',    label:'🔔 Follow-up Center',    group:'Clients'},
+  {key:'schedule',    label:'📅 Schedule',             group:'Clients'},
+  {key:'logistics',   label:'🚐 Route / Logistics',   group:'Clients'},
+  {key:'receipts',    label:'🧾 Service Receipts',     group:'Documents'},
+  {key:'complaints',  label:'🛡️ Complaints & Warranty',group:'Documents'},
+  {key:'revenue',     label:'💰 Revenue',              group:'Reports'},
+  {key:'reports',     label:'📈 Reports & Charts',     group:'Reports'},
+  {key:'accounting',  label:'🧮 Accounting',           group:'Reports'},
+  {key:'unitsales',   label:'🏷️ Unit Sales',           group:'Reports'},
+  {key:'trash',       label:'🗑️ Trash',                group:'System'},
+  {key:'archive',     label:'📦 Archive',              group:'System'},
+  {key:'activity',    label:'📜 Activity Log',         group:'System'},
+  {key:'settings',    label:'⚙️ Settings & Account',   group:'System'}
+];
+
+// Default permissions per role
+function getDefaultPerms(role) {
+  var all = PERMISSION_SECTIONS.map(function(s){ return s.key; });
+  if (role === 'owner') return all.slice();
+  if (role === 'admin') return all.filter(function(k){ return k!=='revenue'&&k!=='reports'&&k!=='accounting'&&k!=='unitsales'; });
+  if (role === 'sr_tech') return ['dashboard','my-jobs','schedule','clients','activity','settings'];
+  if (role === 'jr_tech' || role === 'helper' || role === 'others') return ['my-jobs','activity','settings'];
+  if (role === 'sales' || role === 'marketing') return ['bookings','clients','activity','settings'];
+  if (role === 'mama') return ['mama-commissions','clients','followup','activity','settings'];
+  return ['dashboard','activity','settings'];
+}
+
+// Check if current user has permission for a section
+function hasPermission(username, section) {
+  var u = USERS[username];
+  if (!u) return false;
+  if (u.role === 'owner') return true;
+  if (section === 'settings' || section === 'activity') return true;
+  if (u.permissions && Array.isArray(u.permissions)) return u.permissions.indexOf(section) !== -1;
+  return getDefaultPerms(u.role).indexOf(section) !== -1;
+}
+
+// Build permission checkboxes HTML for add/edit account forms
+function buildPermissionToggles(role, currentPerms) {
+  var defaults = getDefaultPerms(role || 'admin');
+  var perms = currentPerms || defaults;
+  var groups = {};
+  PERMISSION_SECTIONS.forEach(function(s) {
+    if (!groups[s.group]) groups[s.group] = [];
+    groups[s.group].push(s);
+  });
+  var h = '<div id="ac_perms_wrap" style="margin-top:12px">'
+    + '<label style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+    + '🔐 Section Access'
+    + '<span style="font-weight:400;font-size:11px;color:var(--text-dim)">(i-toggle kung ano makikita nila)</span></label>';
+  Object.keys(groups).forEach(function(g) {
+    h += '<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">'+g+'</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    groups[g].forEach(function(s) {
+      var checked = perms.indexOf(s.key) !== -1;
+      var locked = s.key === 'settings' || s.key === 'activity';
+      h += '<label style="display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:'
+        + (checked ? 'var(--accent-soft)' : 'var(--bg-elev2)')
+        + ';cursor:'+(locked?'not-allowed':'pointer')+';opacity:'+(locked?'.6':'1')+';user-select:none">'
+        + '<input type="checkbox" class="ac_perm_cb" value="'+s.key+'"'+(checked?' checked':'')+(locked?' disabled':'')+' style="accent-color:var(--accent);margin:0">'
+        + ' '+s.label+'</label>';
+    });
+    h += '</div></div>';
+  });
+  h += '<div style="margin-top:6px;display:flex;gap:8px">'
+    + '<button type="button" class="btn btn-outline btn-xs" onclick="toggleAllPerms(true)">Select All</button>'
+    + '<button type="button" class="btn btn-outline btn-xs" onclick="toggleAllPerms(false)">Deselect All</button>'
+    + '<button type="button" class="btn btn-outline btn-xs" onclick="resetPermsToDefault()">Reset to Default</button>'
+    + '</div></div>';
+  return h;
+}
+
+function toggleAllPerms(on) {
+  document.querySelectorAll('.ac_perm_cb').forEach(function(cb){ if(!cb.disabled) cb.checked = on; });
+  updatePermToggleStyles();
+}
+function resetPermsToDefault() {
+  var role = document.getElementById('ac_role')?.value || 'admin';
+  var defaults = getDefaultPerms(role);
+  document.querySelectorAll('.ac_perm_cb').forEach(function(cb){
+    if(!cb.disabled) cb.checked = defaults.indexOf(cb.value) !== -1;
+  });
+  updatePermToggleStyles();
+}
+function updatePermToggleStyles() {
+  document.querySelectorAll('.ac_perm_cb').forEach(function(cb){
+    cb.closest('label').style.background = cb.checked ? 'var(--accent-soft)' : 'var(--bg-elev2)';
+  });
+}
+function getSelectedPerms() {
+  var perms = [];
+  document.querySelectorAll('.ac_perm_cb:checked').forEach(function(cb){ perms.push(cb.value); });
+  return perms;
+}
 
 // Service Catalog — base prices, descriptions, categories
 const DEFAULT_SERVICE_CATALOG = {
@@ -1607,76 +1716,69 @@ function getPreparedByLine() {
 function buildNav() {
   const nav = document.getElementById('sidebarNav');
   const r = session.role;
+  const u = session.username;
   const isOwner = r==='owner';
-  const isAdmin = r==='admin';
-  const isSales = r==='sales'||r==='marketing';
-  const isSrTech = r==='sr_tech';
-  const isTech = r==='jr_tech'||r==='helper'||r==='others';
-  const isStaff = isOwner||isAdmin;
   const dueCount = getDueClients().length;
   const followCount = getFollowUpDue().length;
   const alertBadge = dueCount+followCount>0 ? `<span class="nav-badge nav-badge-warn">${dueCount+followCount}</span>` : '';
-  let h = '';
-
-  if (isStaff) {
-    h += `<div class="nav-sec">Main</div>
-    <div class="nav-item" data-tip="Dashboard" onclick="switchView('dashboard',event)"><span class="ic">📊</span><span class="nav-label">Dashboard</span></div>
-    <div class="nav-item" data-tip="Bookings" onclick="switchView('bookings',event)"><span class="ic">📋</span><span class="nav-label">All Bookings</span><span class="nav-badge" id="navPending" style="display:none">0</span></div>
-    <div class="nav-item" data-tip="Job Management" onclick="switchView('jobs',event)"><span class="ic">🔧</span><span class="nav-label">Job Management</span></div>
-    <div class="nav-sec">Clients</div>
-    <div class="nav-item" data-tip="Clients" onclick="switchView('clients',event)"><span class="ic">👥</span><span class="nav-label">Client Records</span></div>
-    <div class="nav-item" data-tip="Follow-up Center" onclick="switchView('followup',event)"><span class="ic">🔔</span><span class="nav-label">Follow-up Center</span>${alertBadge}</div>
-    <div class="nav-item" data-tip="Schedule" onclick="switchView('schedule',event)"><span class="ic">📅</span><span class="nav-label">Schedule</span></div>
-    <div class="nav-item" data-tip="Logistics" onclick="switchView('logistics',event)"><span class="ic">🚐</span><span class="nav-label">Route / Logistics</span></div>
-    <div class="nav-sec">Documents</div>
-    <div class="nav-item" data-tip="Service Receipts" onclick="switchView('receipts',event)"><span class="ic">🧾</span><span class="nav-label">Service Receipts</span></div>
-    <div class="nav-item" data-tip="Complaints & Warranty" onclick="switchView('complaints',event)"><span class="ic">🛡️</span><span class="nav-label">Complaints & Warranty</span></div>`;
-  }
-
-  if (isOwner) {
-    h += `<div class="nav-sec">Reports</div>
-    <div class="nav-item" data-tip="Revenue" onclick="switchView('revenue',event)"><span class="ic">💰</span><span class="nav-label">Revenue</span></div>
-    <div class="nav-item" data-tip="Reports" onclick="switchView('reports',event)"><span class="ic">📈</span><span class="nav-label">Reports & Charts</span></div>
-    <div class="nav-item" data-tip="Accounting" onclick="switchView('accounting',event)"><span class="ic">🧮</span><span class="nav-label">Accounting</span></div>
-    <div class="nav-item" data-tip="Unit Sales" onclick="switchView('unitsales',event)"><span class="ic">🏷️</span><span class="nav-label">Unit Sales</span></div>`;
-  }
-
-  if (isSales) {
-    h = `<div class="nav-sec">Main</div>
-    <div class="nav-item" data-tip="Bookings" onclick="switchView('bookings',event)"><span class="ic">📋</span><span class="nav-label">Bookings</span></div>
-    <div class="nav-item" data-tip="Clients" onclick="switchView('clients',event)"><span class="ic">👥</span><span class="nav-label">Clients</span></div>`;
-  }
-
-  if (isSrTech) {
-    h = `<div class="nav-sec">My Work</div>
-    <div class="nav-item" data-tip="My Jobs" onclick="switchView('my-jobs',event)"><span class="ic">🔧</span><span class="nav-label">My Assigned Jobs</span></div>
-    <div class="nav-item" data-tip="Schedule" onclick="switchView('schedule',event)"><span class="ic">📅</span><span class="nav-label">Schedule</span></div>
-    <div class="nav-item" data-tip="Clients" onclick="switchView('clients',event)"><span class="ic">👥</span><span class="nav-label">Clients</span></div>`;
-  }
-
-  if (isTech) {
-    h = `<div class="nav-sec">My Work</div>
-    <div class="nav-item" data-tip="My Jobs" onclick="switchView('my-jobs',event)"><span class="ic">🔧</span><span class="nav-label">My Assigned Jobs</span></div>`;
-  }
-
-  if (r==='mama') {
-    h = `<div class="nav-sec">My Dashboard</div>
-    <div class="nav-item" data-tip="Commissions" onclick="switchView('mama-commissions',event)"><span class="ic">💵</span><span class="nav-label">My Commissions</span></div>
-    <div class="nav-sec">Clients</div>
-    <div class="nav-item" data-tip="Clients" onclick="switchView('clients',event)"><span class="ic">👥</span><span class="nav-label">Client Records</span></div>
-    <div class="nav-item" data-tip="Follow-up Center" onclick="switchView('followup',event)"><span class="ic">🔔</span><span class="nav-label">Follow-up Center</span>${alertBadge}</div>`;
-  }
-
   const trashCount = Object.values(BOOKINGS).filter(b=>b.status==='Deleted').length;
   const trashBadge = trashCount>0 ? `<span class="nav-badge" style="background:var(--danger)">${trashCount}</span>` : '';
-  const trashNavItems = isStaff ? `
-  <div class="nav-item" data-tip="Trash" onclick="switchView('trash',event)"><span class="ic">🗑️</span><span class="nav-label">Trash</span>${trashBadge}</div>
-  <div class="nav-item" data-tip="Archive" onclick="switchView('archive',event)"><span class="ic">📦</span><span class="nav-label">Archive</span></div>` : '';
 
-  h += `<div class="nav-sec">System</div>
-  <div class="nav-item" data-tip="Activity Log" onclick="switchView('activity',event)"><span class="ic">📜</span><span class="nav-label">Activity Log</span></div>
-  <div class="nav-item" data-tip="Settings" onclick="switchView('settings',event)"><span class="ic">⚙️</span><span class="nav-label">Settings & Account</span></div>
-  ${trashNavItems}`;
+  // Helper: only show nav item if user has permission
+  function ni(section, icon, label, extra) {
+    if (!hasPermission(u, section)) return '';
+    return '<div class="nav-item" data-tip="'+label+'" onclick="switchView(\''+section+'\',event)"><span class="ic">'+icon+'</span><span class="nav-label">'+label+'</span>'+(extra||'')+'</div>';
+  }
+  // Section header — only show if at least one item in the group is permitted
+  function sec(title, keys) {
+    for(var i=0;i<keys.length;i++){ if(hasPermission(u,keys[i])) return '<div class="nav-sec">'+title+'</div>'; }
+    return '';
+  }
+
+  let h = '';
+
+  // Main
+  h += sec('Main',['dashboard','bookings','jobs']);
+  h += ni('dashboard','📊','Dashboard');
+  h += ni('bookings','📋','All Bookings','<span class="nav-badge" id="navPending" style="display:none">0</span>');
+  h += ni('jobs','🔧','Job Management');
+
+  // Special: my-jobs for tech roles (always if they have the role, not permission-gated)
+  if (r==='sr_tech'||r==='jr_tech'||r==='helper'||r==='others') {
+    h += sec('My Work',['my-jobs']);
+    h += '<div class="nav-item" data-tip="My Jobs" onclick="switchView(\'my-jobs\',event)"><span class="ic">🔧</span><span class="nav-label">My Assigned Jobs</span></div>';
+  }
+  // Special: mama commissions
+  if (r==='mama') {
+    h += '<div class="nav-sec">My Dashboard</div>';
+    h += '<div class="nav-item" data-tip="Commissions" onclick="switchView(\'mama-commissions\',event)"><span class="ic">💵</span><span class="nav-label">My Commissions</span></div>';
+  }
+
+  // Clients
+  h += sec('Clients',['clients','followup','schedule','logistics']);
+  h += ni('clients','👥','Client Records');
+  h += ni('followup','🔔','Follow-up Center',alertBadge);
+  h += ni('schedule','📅','Schedule');
+  h += ni('logistics','🚐','Route / Logistics');
+
+  // Documents
+  h += sec('Documents',['receipts','complaints']);
+  h += ni('receipts','🧾','Service Receipts');
+  h += ni('complaints','🛡️','Complaints & Warranty');
+
+  // Reports (owner-level, but now permission-gated so admin can be granted too)
+  h += sec('Reports',['revenue','reports','accounting','unitsales']);
+  h += ni('revenue','💰','Revenue');
+  h += ni('reports','📈','Reports & Charts');
+  h += ni('accounting','🧮','Accounting');
+  h += ni('unitsales','🏷️','Unit Sales');
+
+  // System — always show
+  h += '<div class="nav-sec">System</div>';
+  h += ni('activity','📜','Activity Log');
+  h += ni('settings','⚙️','Settings & Account');
+  h += ni('trash','🗑️','Trash',trashBadge);
+  h += ni('archive','📦','Archive');
 
   nav.innerHTML = h;
   updateNavBadges();
@@ -1695,6 +1797,13 @@ function updateNavBadges() {
    VIEW SWITCHING
 =========================== */
 function switchView(name, ev) {
+  // Permission guard — block access to sections user doesn't have permission for
+  if (session && session.username && name !== 'settings' && name !== 'activity' && name !== 'my-jobs' && name !== 'mama-commissions') {
+    if (!hasPermission(session.username, name)) {
+      showToast('You don\'t have access to this section','error');
+      return;
+    }
+  }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const view = document.getElementById('view-'+name);
@@ -11022,13 +11131,14 @@ function openEditAccount(username){
   document.getElementById('emTitle').textContent = 'Edit Account';
   document.getElementById('emSub').textContent = '@'+username;
   var isOwner = u.role === 'owner';
+  var currentPerms = u.permissions && Array.isArray(u.permissions) ? u.permissions : getDefaultPerms(u.role);
   document.getElementById('emBody').innerHTML = '<div class="form-grid">'
     +'<div class="field"><label>Username'+(isOwner?' (locked)':'')+'</label>'
     +'<input id="ea_user" value="'+u.username+'" placeholder="lowercase only"'+(isOwner?' readonly style="opacity:.7;background:var(--bg-elev2)"':'')+'></div>'
     +'<div class="field"><label>Display Name</label>'
     +'<input id="ea_name" value="'+u.name+'" placeholder="Full name"></div>'
     +'<div class="field"><label>Role'+(isOwner?' (locked)':'')+'</label>'
-    +'<select id="ea_role"'+(isOwner?' disabled':'')+'>'+
+    +'<select id="ea_role"'+(isOwner?' disabled':'')+' onchange="document.getElementById(\'ac_perms_area\').innerHTML=buildPermissionToggles(this.value);updatePermToggleStyles()">'+
     (isOwner?'<option value="owner" selected>Owner</option>':'')+
     '<option value="admin"'+(u.role==='admin'?' selected':'')+'>Admin/Dispatcher</option>'+
     '<option value="sales"'+(u.role==='sales'?' selected':'')+'>Sales</option>'+
@@ -11040,11 +11150,13 @@ function openEditAccount(username){
     '</select></div>'
     +'<div class="field"><label>New Password <span style="font-weight:400;color:var(--text-dim)">(blank = no change)</span></label>'
     +'<input type="password" id="ea_pw" placeholder="Min. 6 chars"></div>'
-    +'</div>';
+    +'</div>'
+    +(isOwner ? '' : '<div id="ac_perms_area">'+buildPermissionToggles(u.role, currentPerms)+'</div>');
   document.getElementById('emFoot').innerHTML =
     '<button class="btn btn-outline btn-sm" data-close-modal="editModal">Cancel</button> '
     +'<button class="btn btn-gold btn-sm" data-save-edit="'+username+'">Save Changes</button>';
   openModal('editModal');
+  if(!isOwner) setTimeout(function(){ updatePermToggleStyles(); }, 50);
 }
 
 function saveEditAccount(oldUsername){
@@ -11062,6 +11174,10 @@ function saveEditAccount(oldUsername){
     username: newU, name: name,
     role: u.role==='owner' ? 'owner' : role
   });
+  // Save permissions (not for owner)
+  if(u.role !== 'owner') {
+    updated.permissions = getSelectedPerms();
+  }
   if(pw){ updated.password=pw; updated.lastPwChange=new Date().toISOString(); updated.forceChange=false; }
   if(newU!==oldUsername) {
     delete USERS[oldUsername];
@@ -11391,13 +11507,15 @@ function removeAccount(username){
 function openAddAccount(){
   document.getElementById('emTitle').textContent='Add Portal Account';
   document.getElementById('emSub').textContent='Owner can add admin or technician accounts';
+  var defaultRole = 'admin';
   document.getElementById('emBody').innerHTML=`
     <div class="form-grid">
       <div class="field"><label>Username *</label><input id="ac_user" placeholder="e.g. tech4 (lowercase only)"></div>
       <div class="field"><label>Display Name *</label><input id="ac_name" placeholder="e.g. Helper 3"></div>
-      <div class="field"><label>Role *</label><select id="ac_role"><option value="admin">🛠️ Admin/Dispatcher</option><option value="tech">👷 Technician</option></select></div>
+      <div class="field"><label>Role *</label><select id="ac_role" onchange="document.getElementById('ac_perms_area').innerHTML=buildPermissionToggles(this.value);updatePermToggleStyles()"><option value="admin">🛠️ Admin/Dispatcher</option><option value="sr_tech">👷 Sr. Technician</option><option value="jr_tech">👷 Jr. Technician</option><option value="helper">🤝 Helper</option><option value="sales">💼 Sales</option><option value="marketing">📣 Marketing</option><option value="others">👤 Others</option></select></div>
       <div class="field"><label>Temporary Password *</label><input type="password" id="ac_pw" placeholder="Min. 6 characters"></div>
     </div>
+    <div id="ac_perms_area">${buildPermissionToggles(defaultRole)}</div>
     <div style="background:var(--info-soft);border:1px solid var(--info);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:8px;color:var(--info)">
       💡 User will be required to change their password on first login.
     </div>`;
@@ -11405,6 +11523,7 @@ function openAddAccount(){
     <button class="btn btn-outline btn-sm" onclick="closeModal('editModal')">Cancel</button>
     <button class="btn btn-gold btn-sm" onclick="saveNewAccount()">💾 Create Account</button>`;
   openModal('editModal');
+  setTimeout(function(){ updatePermToggleStyles(); }, 50);
 }
 
 function saveNewAccount(){
@@ -11417,10 +11536,11 @@ function saveNewAccount(){
   if(USERS[u]){showToast('Username @'+u+' already exists','error');return;}
   if(!/^[a-z0-9_]+$/.test(u)){showToast('Username: lowercase letters, numbers, underscore only','error');return;}
   const initials=n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-  USERS[u]={username:u,password:p,name:n,role:r,avatar:initials,lastPwChange:null,forceChange:true};
+  const perms=getSelectedPerms();
+  USERS[u]={username:u,password:p,name:n,role:r,avatar:initials,lastPwChange:null,forceChange:true,permissions:perms};
   saveAccounts();
   syncAccountToSheets(USERS[u]);
-  logActivity('➕','Owner created account @'+u+' ('+n+')','settings');
+  logActivity('➕','Owner created account @'+u+' ('+n+') with '+perms.length+' permissions','settings');
   closeModal('editModal');
   showToast('Account @'+u+' created! They must change password on first login.','success');
   switchView('settings');
