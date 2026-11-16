@@ -92,7 +92,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--white);color:va
   padding:120px 40px 80px;
 }
 .hero-bg-orb{
-  position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;
+  position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;
 }
 .orb1{width:600px;height:600px;background:rgba(59,130,246,0.15);top:-100px;right:-100px;}
 .orb2{width:400px;height:400px;background:rgba(245,158,11,0.08);bottom:-50px;left:200px;}
@@ -102,7 +102,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--white);color:va
 #hero::before{
   content:'';position:absolute;inset:0;
   background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);
-  background-size:60px 60px;pointer-events:none;
+  background-size:60px 60px;pointer-events:none;z-index:0;
 }
 #hero-particles{position:absolute;inset:0;pointer-events:none;z-index:0;}
 
