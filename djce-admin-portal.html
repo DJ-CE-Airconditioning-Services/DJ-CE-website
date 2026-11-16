@@ -10907,7 +10907,7 @@ function openClientModal(key){
     '<div class="info-row"><span class="info-label">Last Date</span>'+formatDate(c.lastServiceDate)+'</div>'+
     (c.lastCleaningInfo?'<div class="info-row"><span class="info-label">Cleaning Info</span>'+c.lastCleaningInfo+'</div>':'')+
     '<div class="info-row"><span class="info-label">Usage Freq.</span>'+(c.usage||'Not set')+'</div>'+
-    '<div class="info-row"><span class="info-label">Next Cleaning</span><strong style="color:var(--accent)">'+(c.nextCleaningDate?formatDate(c.nextCleaningDate):'Not set')+'</strong></div>'+
+    '<div class="info-row"><span class="info-label">Next Cleaning</span><strong style="color:var(--accent)">'+(c.nextCleaningDate?formatDate(c.nextCleaningDate)+' <span style="font-size:11px;color:var(--gold);font-weight:600;background:var(--card);border-radius:6px;padding:3px 10px;margin-left:6px">'+(function(){var d=new Date(c.nextCleaningDate+"T00:00:00"),n=new Date(),m=(d.getFullYear()-n.getFullYear())*12+(d.getMonth()-n.getMonth()),dy=Math.round((d-n)/864e5);return dy<0?"⚠️ Overdue":m<1?"≈ "+dy+"d":("≈ "+m+" mo"+(m!==1?"s":""))})()+'</span>':'Not set')+'</strong></div>'+
     '</div></div>'+
     (c.notes?'<div class="sec-divider" style="margin-top:14px">Notes</div><div style="font-size:13px;line-height:1.6;padding:8px 0">'+renderNotesHtml(c.notes)+'</div>':'')+
     '<div class="sec-divider" style="margin-top:14px">Booking History ('+bks.length+')</div>'+
@@ -10959,6 +10959,8 @@ function editClientModal(id){
     '<div class="field"><label>AC Usage Frequency</label><select id="ec_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(function(u){return '<option'+(c.usage===u.label?' selected':'')+'>'+u.label+'</option>';}).join('')+
     '</select></div>'+
+    '<div class="field"><label>Next Cleaning</label><input type="date" id="ec_nextClean" value="'+(c.nextCleaningDate||'')+'" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\'ec_nextLbl\')" style="width:100%"></div>'+
+    '<div class="field"><label>&nbsp;</label><span id="ec_nextLbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:'+(c.nextCleaningDate?'inline-block':'none')+'">'+(c.nextCleaningDate?(function(){var d=new Date(c.nextCleaningDate+"T00:00:00"),n=new Date(),m=(d.getFullYear()-n.getFullYear())*12+(d.getMonth()-n.getMonth()),dy=Math.round((d-n)/864e5);return dy<0?"⚠️ Overdue":m<1?"≈ "+dy+" day"+(dy!==1?"s":"")+" from now":"≈ "+m+" month"+(m!==1?"s":"")+" from now"})():'')+'</span></div>'+
     '<div class="field form-full"><label>Notes (unit info, brand, etc.)</label>'+richNotesEditor('ec_notes',c.notes||'')+'</div>'+
     '</div>'+
     locationInfoFields('ec',c);
@@ -10996,7 +10998,7 @@ function saveEditClient(){
     usage:usage,
     notes:getNotesContent('ec_notes'),
     locationInfo:getLocationInfo('ec'),
-    nextCleaningDate:calcNextCleaning(lastDate,usage),
+    nextCleaningDate:document.getElementById('ec_nextClean')?.value||calcNextCleaning(lastDate,usage),
     source:source, createdAt:CLIENTS[id]?.createdAt||new Date().toISOString()
   };
   saveLocalData();
