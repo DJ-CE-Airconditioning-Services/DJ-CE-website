@@ -1,7 +1,7 @@
 {
   "name": "DJ-CE Admin Portal",
   "short_name": "DJ-CE",
-  "description": "DJ-CE Aircon & Electrical Services — Admin Portal",
+  "description": "DJ-CE Air-conditioning Services — Admin Portal",
   "start_url": "/DJ-CE-website/djce-admin-portal.html",
   "display": "standalone",
   "background_color": "#0a1628",

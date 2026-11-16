@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * DJ-CE AIRCON & ELECTRICAL SERVICES
+ * DJ-CE AIR-CONDITIONING SERVICES
  * Google Apps Script Backend — v4.0
  * New: Schedule Slots, Client Confirmation Email, Form Validation
  * ============================================================
@@ -9,7 +9,7 @@
 /* ─── CONFIG ──────────────────────────────────────────────── */
 var SHEET_ID      = '1dbMhoFuINB-boqITMExPw9cH_MIrJ4wpqQjwjGcX8S4';
 var NOTIF_EMAIL   = 'djceservicesforyou@gmail.com';
-var BUSINESS_NAME = 'DJ-CE Aircon & Electrical Services';
+var BUSINESS_NAME = 'DJ-CE Air-conditioning Services';
 var BUSINESS_PHONE = '0976 259 2458';
 var BUSINESS_ADDRESS = 'Caniogan, Calumpit, Bulacan';
 var TIMEZONE      = 'Asia/Manila';
@@ -945,7 +945,7 @@ function sendClientConfirmationEmail(id, data, svcSummary, fullAddress) {
     // ── Header ──
     '<div style="background:#0d1f3c;padding:28px 30px;text-align:center">',
     '<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px">DJ-<span style="color:#f59e0b">CE</span></div>',
-    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Aircon & Electrical Services</div>',
+    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Air-conditioning Services</div>',
     '<div style="display:inline-block;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:20px;padding:6px 18px;margin-top:14px">',
     '<span style="color:#f59e0b;font-size:13px;font-weight:700">✅ Booking Received!</span></div>',
     '</div>',
@@ -1040,7 +1040,7 @@ function sendBookingConfirmedEmail(refNo, name, email, service, date, timeSlot, 
 
     '<div style="background:#0d1f3c;padding:28px 30px;text-align:center">',
     '<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px">DJ-<span style="color:#f59e0b">CE</span></div>',
-    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Aircon & Electrical Services</div>',
+    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Air-conditioning Services</div>',
     '<div style="display:inline-block;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);border-radius:20px;padding:6px 18px;margin-top:14px">',
     '<span style="color:#10b981;font-size:13px;font-weight:700">✅ Booking Confirmed!</span></div>',
     '</div>',
@@ -1624,7 +1624,7 @@ function sendServiceReminderEmail(email, name, service, ncd, refNo, daysUntil) {
     '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">',
     '<div style="background:#0d1f3c;padding:24px 30px;text-align:center">',
     '<div style="font-size:26px;font-weight:900;color:#fff">DJ-<span style="color:#f59e0b">CE</span></div>',
-    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Aircon & Electrical Services</div></div>',
+    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Air-conditioning Services</div></div>',
 
     '<div style="background:#fef3c7;padding:16px 30px;text-align:center">',
     '<div style="font-size:24px">' + urgency + '</div>',
@@ -1779,7 +1779,7 @@ function sendRescheduleEmail(email, name, service, refNo, oldDate, oldTime, newD
     // Header
     '<div style="background:#0d1f3c;padding:28px 30px;text-align:center">',
     '<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px">DJ-<span style="color:#f59e0b">CE</span></div>',
-    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Aircon & Electrical Services</div>',
+    '<div style="font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:2px;margin-top:4px">Air-conditioning Services</div>',
     '<div style="display:inline-block;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:20px;padding:6px 18px;margin-top:14px">',
     '<span style="color:#f59e0b;font-size:13px;font-weight:700">📅 Schedule Update</span></div>',
     '</div>',
