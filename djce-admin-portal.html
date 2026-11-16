@@ -2772,7 +2772,7 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>HP *</label>'+hp+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
-      '<div class="field"><label>Next Cleaning</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"><div id="'+p+'nextlbl" style="font-size:10px;color:var(--gold);margin-top:3px"></div></div>'+
+      '<div class="field"><label>Next Cleaning <span id="'+p+'nextlbl" style="font-size:11px;color:var(--gold);font-weight:700"></span></label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
     '</div>';
   }
   if(svc==='Aircon Installation'){
@@ -2789,7 +2789,7 @@ function buildSvcDetailFields(idx, svc){
     return '<div class="form-grid" style="margin-top:6px">'+
       '<div class="field"><label>Brand</label>'+wmBrands+'</div>'+
       '<div class="field"><label>Capacity</label>'+wmCap+'</div>'+
-      '<div class="field"><label>Next Deep Clean</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"><div id="'+p+'nextlbl" style="font-size:10px;color:var(--gold);margin-top:3px"></div></div>'+
+      '<div class="field"><label>Next Deep Clean <span id="'+p+'nextlbl" style="font-size:11px;color:var(--gold);font-weight:700"></span></label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
     '</div>';
   }
   if(svc==='Electrical Works'||svc==='Plumbing'){
