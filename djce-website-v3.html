@@ -1387,6 +1387,38 @@ function validateEmail(inp){
   }
 }
 
+// ── AREA DAY SCHEDULE — same as portal AREA_SCHEDULE ──
+var AREA_SCHEDULE = {
+  'Calumpit': ['Mon','Wed','Fri'],
+  'Malolos': ['Mon','Wed','Fri'],
+  'Guiguinto': ['Tue','Thu','Sat'],
+  'Balagtas': ['Tue','Thu','Sat'],
+  'Pulilan': ['Tue','Thu'],
+  'Plaridel': ['Tue','Thu'],
+  'Bocaue': ['Mon','Wed'],
+  'Apalit': ['Wed','Fri'],
+  'San Miguel': ['Fri'],
+  'Sto. Tomas': ['Sat'],
+  'Angeles': ['Sat'],
+  'San Fernando': ['Sat'],
+  'Pampanga': ['Sat']
+};
+var DAY_NAMES_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// Extract area key from dropdown value (e.g. "Calumpit, Bulacan" → "Calumpit")
+function getAreaKey(cityValue) {
+  if (!cityValue) return '';
+  var parts = cityValue.split(',');
+  return (parts[0] || '').trim();
+}
+
+// Get scheduled days for the selected area
+function getAreaDays() {
+  var v = document.getElementById('f-city').value;
+  var key = getAreaKey(v);
+  return AREA_SCHEDULE[key] || [];
+}
+
 function onAreaChange(sel){
   var warn=document.getElementById('area-warning');
   var otherBox=document.getElementById('area-other-input');
@@ -1403,6 +1435,34 @@ function onAreaChange(sel){
     otherBox.style.display='none';
     document.getElementById('f-city-other').value='';
   }
+  // Re-render calendar with area filter
+  if(AVAILABLE_SLOTS.length || document.getElementById('slot-calendar').style.display==='block'){
+    buildSlotCalendar();
+  }
+  // Show area schedule hint
+  showAreaScheduleHint(v);
+}
+
+function showAreaScheduleHint(areaValue) {
+  var existing = document.getElementById('area-schedule-hint');
+  if (existing) existing.remove();
+  if (!areaValue || areaValue === 'other') return;
+  var key = getAreaKey(areaValue);
+  var days = AREA_SCHEDULE[key];
+  if (!days || !days.length) return;
+  var dayLabels = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
+  var readable = days.map(function(d){ return dayLabels[d]||d; }).join(', ');
+  var hint = document.createElement('div');
+  hint.id = 'area-schedule-hint';
+  hint.style.cssText = 'background:rgba(16,185,129,0.12);border:1.5px solid rgba(16,185,129,0.3);border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;';
+  hint.innerHTML = '<span style="font-size:18px;flex-shrink:0;">📅</span>'
+    + '<div><div style="font-family:Nunito,sans-serif;font-weight:800;color:#10b981;font-size:13px;margin-bottom:2px;">'
+    + key + ' Service Days</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);line-height:1.4;">'
+    + 'Naka-schedule ang ' + key + ' tuwing <strong style="color:#10b981;">' + readable + '</strong>. '
+    + 'Yung mga green dates sa calendar ay available slots para sa area mo.</div></div>';
+  var cal = document.getElementById('slot-calendar');
+  cal.parentNode.insertBefore(hint, cal);
 }
 
 function toggleSvc(el){
@@ -1543,6 +1603,14 @@ function buildSlotCalendar(){
       var hasOpen = dateSlots.some(function(s){ return s.remaining > 0; });
       var hasAny  = dateSlots.length > 0;
 
+      // ── Area-based day filtering ──
+      var areaDays = getAreaDays();
+      var dayOfWeek = new Date(year, month, day).getDay(); // 0=Sun
+      var dayName = DAY_NAMES_SHORT[dayOfWeek];
+      var isAreaDay = areaDays.length === 0 || areaDays.indexOf(dayName) !== -1;
+      // If area selected but this day is NOT on the area's schedule
+      var offSchedule = areaDays.length > 0 && !isAreaDay;
+
       var status, dotColor, bgColor, borderColor, cursor, numColor;
       if(isPast){
         status = 'past';
@@ -1550,6 +1618,14 @@ function buildSlotCalendar(){
         borderColor = 'transparent';
         dotColor = '';
         cursor = 'default';
+        numColor = 'rgba(255,255,255,0.15)';
+      } else if(offSchedule){
+        // Area selected but date not on schedule — dim it
+        status = 'off-schedule';
+        dotColor = '';
+        bgColor = 'rgba(255,255,255,0.02)';
+        borderColor = 'rgba(255,255,255,0.05)';
+        cursor = 'not-allowed';
         numColor = 'rgba(255,255,255,0.15)';
       } else if(hasOpen){
         status = 'available';
@@ -1576,7 +1652,7 @@ function buildSlotCalendar(){
 
       var todayRing = isToday ? 'box-shadow:0 0 0 2px #f59e0b;' : '';
       var slotsLeft = 0;
-      if(hasOpen) dateSlots.forEach(function(s){ slotsLeft += (s.remaining||0); });
+      if(hasOpen && !offSchedule) dateSlots.forEach(function(s){ slotsLeft += (s.remaining||0); });
 
       html += '<button type="button" class="slot-date-btn" data-date="'+dateStr+'" data-status="'+status+'" '
         + (status==='available'?'onclick="pickDate(this)"':'disabled ')
@@ -1586,8 +1662,11 @@ function buildSlotCalendar(){
       if(dotColor){
         html += '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin:2px auto 0;"></div>';
       }
-      if(hasOpen){
+      if(hasOpen && !offSchedule){
         html += '<div style="font-size:8px;font-weight:600;color:#10b981;margin-top:1px;">'+slotsLeft+' slot'+(slotsLeft!==1?'s':'')+'</div>';
+      }
+      if(offSchedule && !isPast){
+        html += '<div style="font-size:7px;font-weight:600;color:rgba(255,255,255,0.2);margin-top:1px;">—</div>';
       }
       if(isToday){
         html += '<div style="font-size:7px;font-weight:800;color:#f59e0b;margin-top:1px;">TODAY</div>';
@@ -1604,6 +1683,9 @@ function buildSlotCalendar(){
   html += '<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.5);"><div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div> Available</div>';
   html += '<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.5);"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;"></div> Full</div>';
   html += '<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.5);"><div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);"></div> No slots</div>';
+  if(getAreaDays().length > 0){
+    html += '<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:rgba(255,255,255,0.5);"><div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);"></div> Not your area day</div>';
+  }
   html += '</div>';
 
   // ── Time slot detail area (appears when a green date is clicked) ──
@@ -2267,6 +2349,38 @@ function handleLogoClick(){
 
 // ── INIT GALLERY (must run after GALLERY_PHOTOS is defined) ──
 initGallery();
+
+// ── OPTION B: ?area= URL param auto-select ──
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var areaParam = params.get('area');
+  if(!areaParam) return;
+  var areaLower = areaParam.toLowerCase().trim();
+  var select = document.getElementById('f-city');
+  if(!select) return;
+  // Find matching option
+  var matched = false;
+  for(var i=0; i<select.options.length; i++){
+    var opt = select.options[i];
+    if(opt.disabled || !opt.value) continue;
+    var valLower = opt.value.toLowerCase();
+    var keyLower = getAreaKey(opt.value).toLowerCase();
+    if(keyLower === areaLower || valLower.indexOf(areaLower) !== -1){
+      select.selectedIndex = i;
+      matched = true;
+      break;
+    }
+  }
+  if(matched){
+    // Trigger area change
+    onAreaChange(select);
+    // Scroll to booking section after splash
+    setTimeout(function(){
+      var bookSec = document.getElementById('book');
+      if(bookSec) bookSec.scrollIntoView({behavior:'smooth',block:'start'});
+    },1600);
+  }
+})();
 
 // Splash
 setTimeout(()=>{

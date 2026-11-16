@@ -2327,6 +2327,27 @@ function openBookingDetail(id) {
   document.getElementById('bmSub').textContent = `${b.refNo||b.id} · ${formatDate(b.date)}`;
   document.getElementById('bmBody').innerHTML = `
     ${detBl?'<div style="background:#dc2626;color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:12.5px"><strong>🚫 BLACKLISTED CLIENT</strong> — '+escH(detBlEntry.reason)+'<br><span style="font-size:11px;opacity:.85">'+escH(detBlEntry.notes||'')+'</span></div>':''}
+    ${(function(){
+      if(!b.date || !b.address) return '';
+      var addr = (b.address||'').toLowerCase();
+      var matchedArea = '';
+      var areaKeys = Object.keys(AREA_SCHEDULE);
+      for(var i=0;i<areaKeys.length;i++){
+        if(addr.indexOf(areaKeys[i].toLowerCase()) !== -1){ matchedArea = areaKeys[i]; break; }
+      }
+      if(!matchedArea) return '';
+      var days = AREA_SCHEDULE[matchedArea];
+      if(!days || !days.length) return '';
+      var bDate = new Date(b.date+'T00:00:00');
+      var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var bDay = dayNames[bDate.getDay()];
+      if(days.indexOf(bDay) !== -1) return '';
+      var fullDays = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
+      return '<div style="background:#fbbf24;color:#000;padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:12.5px">'
+        +'<strong>⚠️ AREA-DAY MISMATCH</strong> — '+matchedArea+' is scheduled on <strong>'+days.map(function(d){return fullDays[d]||d;}).join(', ')+'</strong>, '
+        +'but this booking is on <strong>'+fullDays[bDay]+' ('+formatDate(b.date)+')</strong>.'
+        +'<br><span style="font-size:11px;opacity:.85">Consider rescheduling to the correct area day para hindi magka-conflict sa route.</span></div>';
+    })()}
     <div class="form-grid">
       <div><div class="sec-divider">Client Information</div>
         <div class="info-row"><span class="info-label">Reference No.</span><span class="info-val"><strong style="color:var(--accent);font-family:monospace">${b.refNo||b.id}</strong></span></div>
