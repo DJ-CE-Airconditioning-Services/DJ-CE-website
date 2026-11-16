@@ -10428,14 +10428,14 @@ function openNewClient(){
     '<div class="field"><label>Last Service Done</label><input id="nc_lastSvc" placeholder="e.g. Aircon Cleaning – Split Type"></div>'+
     '<div class="field"><label>Last Service Date</label><input type="date" id="nc_lastDate"></div>'+
     '<div class="field form-full"><label>Last Cleaning Info (if no exact date)</label><input id="nc_lastInfo" placeholder="e.g. Mga 5 months ago, last summer, di pa na-clean"></div>'+
-    '<div class="field"><label>AC Usage Frequency *</label><select id="nc_usage"><option value="">— Select —</option>'+
+    '<div class="field"><label>AC Usage Frequency</label><select id="nc_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(u=>'<option>'+u.label+'</option>').join('')+
     '</select></div>'+
+    '<div class="field"><label>Next Cleaning</label><input type="date" id="nc_nextClean" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\'nc_nextLbl\')" style="width:100%"></div>'+
+    '<div class="field"><label>&nbsp;</label><span id="nc_nextLbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:none"></span></div>'+
     '<div class="field form-full"><label>Notes (unit info, brand, etc.)</label>'+richNotesEditor('nc_notes','')+'</div>'+
     '</div>'+
-    locationInfoFields('nc',{})+
-    '<div style="background:var(--info-soft);border:1px solid var(--info);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:6px">'+
-    '💡 Next cleaning date will be auto-calculated based on usage frequency. Perfect for importing old clients!</div>';
+    locationInfoFields('nc',{});
   document.getElementById('emFoot').innerHTML=
     '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button>'+
     '<button class="btn btn-gold btn-sm" onclick="saveNewClient()">💾 Save Client</button>';
@@ -10459,7 +10459,7 @@ function saveNewClient(){
     usage,
     notes:getNotesContent('nc_notes'),
     locationInfo:getLocationInfo('nc'),
-    nextCleaningDate:calcNextCleaning(lastDate,usage),
+    nextCleaningDate:document.getElementById('nc_nextClean')?.value||calcNextCleaning(lastDate,usage),
     source:'manual',createdAt:new Date().toISOString()
   };
   saveLocalData();
