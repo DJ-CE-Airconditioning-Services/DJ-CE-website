@@ -3877,23 +3877,7 @@ function renderSlotSidePanel(dateStr){
     return sd===dateStr;
   }).sort(function(a,b){return (a.timeSlot||'').localeCompare(b.timeSlot||'');});
 
-  // Check area schedule
-  var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var dayName=dayNames[d.getDay()];
-  var areasForDay=[];
-  var areaKeys=Object.keys(AREA_SCHEDULE);
-  for(var i=0;i<areaKeys.length;i++){
-    if(AREA_SCHEDULE[areaKeys[i]].indexOf(dayName)!==-1) areasForDay.push(areaKeys[i]);
-  }
-
   var html='';
-
-  // Area schedule info
-  if(areasForDay.length){
-    html+='<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:3px;">📍 '+dayName+' Areas</div>'
-      +'<div style="font-size:12px;color:var(--text-dim);line-height:1.5;">'+areasForDay.join(', ')+'</div></div>';
-  }
 
   // Existing slots for this date
   if(daySlots.length){
