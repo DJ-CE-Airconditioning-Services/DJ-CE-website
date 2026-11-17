@@ -3740,6 +3740,29 @@ function renderSchedule() {
           <div style="font-size:10px;color:var(--text-dim);margin-top:8px;">Click × para alisin. I-add ang mga bagong service area gamit ang button sa taas.</div>
         </div>
       </div>
+      <!-- Area Day Schedule -->
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head">
+          <div class="panel-title">📅 Area Day Schedule</div>
+        </div>
+        <div class="panel-body" style="padding:12px 14px;">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">I-set kung anong araw ang bawat area. Ito ang lalabas na guide sa slot calendar.</div>
+          <div id="areaDayScheduleEditor" style="display:flex;flex-direction:column;gap:8px;">
+            ${SERVICE_AREAS.map(function(area){
+              var days=AREA_SCHEDULE[area]||[];
+              return '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">'
+                +'<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px;">📍 '+area+'</div>'
+                +'<div style="display:flex;flex-wrap:wrap;gap:4px;">'
+                +['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d){
+                  var active=days.indexOf(d)!==-1;
+                  return '<button onclick="toggleAreaDay(\''+area+'\',\''+d+'\')" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+(active?'var(--accent)':'var(--border)')+';background:'+(active?'var(--accent)':'var(--bg)')+';color:'+(active?'#fff':'var(--text-dim)')+';transition:all .15s;">'+d+'</button>';
+                }).join('')
+                +'</div>'
+              +'</div>';
+            }).join('')}
+          </div>
+        </div>
+      </div>
     </div>` : ''}
   </div>`;
 }
@@ -3769,6 +3792,18 @@ function removeServiceArea(name){
   // Also remove from AREA_SCHEDULE
   if(AREA_SCHEDULE[name]){delete AREA_SCHEDULE[name]; saveAreaSchedule();}
   showToast(name+' removed','success');
+  var view=document.getElementById('view-schedule');
+  if(view) view.innerHTML=renderView('schedule');
+  switchSchedTab('slots');
+}
+
+function toggleAreaDay(area, day){
+  if(!AREA_SCHEDULE[area]) AREA_SCHEDULE[area]=[];
+  var idx=AREA_SCHEDULE[area].indexOf(day);
+  if(idx===-1){ AREA_SCHEDULE[area].push(day); }
+  else { AREA_SCHEDULE[area].splice(idx,1); }
+  saveAreaSchedule();
+  // Re-render just the editor
   var view=document.getElementById('view-schedule');
   if(view) view.innerHTML=renderView('schedule');
   switchSchedTab('slots');
@@ -3877,7 +3912,23 @@ function renderSlotSidePanel(dateStr){
     return sd===dateStr;
   }).sort(function(a,b){return (a.timeSlot||'').localeCompare(b.timeSlot||'');});
 
+  // Check area schedule for this day
+  var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dayName=dayNames[d.getDay()];
+  var areasForDay=[];
+  var areaKeys=Object.keys(AREA_SCHEDULE);
+  for(var i=0;i<areaKeys.length;i++){
+    if(AREA_SCHEDULE[areaKeys[i]].indexOf(dayName)!==-1) areasForDay.push(areaKeys[i]);
+  }
+
   var html='';
+
+  // Area schedule info
+  if(areasForDay.length){
+    html+='<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:10px 12px;margin-bottom:12px;">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:3px;">📍 '+dayName+' Areas</div>'
+      +'<div style="font-size:12px;color:var(--text-dim);line-height:1.5;">'+areasForDay.join(', ')+'</div></div>';
+  }
 
   // Existing slots for this date
   if(daySlots.length){
