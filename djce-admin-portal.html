@@ -2770,6 +2770,7 @@ function showMonthsAway(input, lblId){
 function buildSvcDetailFields(idx, svc){
   if(!svc) return '';
   var p='svc_'+idx+'_';
+  var amtField='<div class="field"><label>Amount (₱)</label><input type="number" id="'+p+'amount" placeholder="0.00" min="0" step="0.01" style="width:100%"></div>';
   var hp='<select id="'+p+'hp"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
   var bac='<select id="'+p+'brand"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>';
   var fl='<select id="'+p+'floor"><option value="">— Floor —</option>'+FLOOR_OPTS.map(function(f){return '<option>'+f+'</option>';}).join('')+'</select>';
@@ -2780,6 +2781,7 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>HP *</label>'+hp+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
+      amtField+
       '<div class="field"><label>Next Cleaning</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
       '<div class="field"><label>&nbsp;</label><span id="'+p+'nextlbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:none"></span></div>'+
     '</div>';
@@ -2790,6 +2792,7 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>HP *</label>'+hp+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
+      amtField+
     '</div>';
   }
   if(svc.includes('AWM Deep Clean')){
@@ -2798,15 +2801,16 @@ function buildSvcDetailFields(idx, svc){
     return '<div class="form-grid" style="margin-top:6px">'+
       '<div class="field"><label>Brand</label>'+wmBrands+'</div>'+
       '<div class="field"><label>Capacity</label>'+wmCap+'</div>'+
+      amtField+
       '<div class="field"><label>Next Deep Clean</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
       '<div class="field"><label>&nbsp;</label><span id="'+p+'nextlbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:none"></span></div>'+
     '</div>';
   }
   if(svc==='Electrical Works'||svc==='Plumbing'){
-    return '<div style="margin-top:6px"><div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. No power sa isang room, leaking pipe, etc." style="min-height:60px"></textarea></div></div>';
+    return '<div style="margin-top:6px"><div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. No power sa isang room, leaking pipe, etc." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
   }
   if(svc==='Others'){
-    return '<div style="margin-top:6px"><div class="field"><label>Describe the service needed *</label><textarea id="'+p+'issue" placeholder="Describe what service is needed..." style="min-height:60px"></textarea></div></div>';
+    return '<div style="margin-top:6px"><div class="field"><label>Describe the service needed *</label><textarea id="'+p+'issue" placeholder="Describe what service is needed..." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
   }
   return '';
 }
@@ -2819,7 +2823,7 @@ function getServiceDetails() {
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
     var item={service:svc, brand:pick('brand'), hp:pick('hp'), actype:pick('actype'),
-      floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate')};
+      floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount')};
     entries.push(item);
     var pts=[svc];
     if(item.actype)pts.push(item.actype);
@@ -2828,6 +2832,7 @@ function getServiceDetails() {
     if(item.wmcap)pts.push(item.wmcap);
     if(item.floor)pts.push(item.floor);
     if(item.issue)pts.push(item.issue.substring(0,50));
+    if(item.amount)pts.push('₱'+parseFloat(item.amount).toLocaleString());
     summaryParts.push(pts.join(' · '));
   });
   return {fields:{serviceEntries:entries}, summary:summaryParts.join(' | ')};
@@ -10917,9 +10922,9 @@ function openClientModal(key){
     :'')+
     '</div>'+
     '<div><div class="sec-divider">Service Tracking</div>'+
-    '<div class="info-row"><span class="info-label">Last Service</span>'+(c.lastService||'—')+'</div>'+
-    '<div class="info-row"><span class="info-label">Last Date</span>'+formatDate(c.lastServiceDate)+'</div>'+
-    (c.lastCleaningInfo?'<div class="info-row"><span class="info-label">Cleaning Info</span>'+c.lastCleaningInfo+'</div>':'')+
+    '<div class="info-row"><span class="info-label">Services</span>'+(c.serviceDetailsSummary||c.lastService||'—')+'</div>'+
+    (c.serviceDetails&&c.serviceDetails.serviceEntries?(function(){var total=0;c.serviceDetails.serviceEntries.forEach(function(e){if(e.amount)total+=parseFloat(e.amount)||0;});return total?'<div class="info-row"><span class="info-label">💰 Total Amount</span><strong style="color:var(--success)">₱'+total.toLocaleString(undefined,{minimumFractionDigits:2})+'</strong></div>':'';})():'')+
+    (c.lastServiceDate?'<div class="info-row"><span class="info-label">Last Date</span>'+formatDate(c.lastServiceDate)+'</div>':'')+
     '<div class="info-row"><span class="info-label">Usage Freq.</span>'+(c.usage||'Not set')+'</div>'+
     '<div class="info-row"><span class="info-label">Next Cleaning</span><strong style="color:var(--accent)">'+(c.nextCleaningDate?formatDate(c.nextCleaningDate)+' <span style="font-size:11px;color:var(--gold);font-weight:600;background:var(--card);border-radius:6px;padding:3px 10px;margin-left:6px">'+(function(){var d=new Date(c.nextCleaningDate+"T00:00:00"),n=new Date(),m=(d.getFullYear()-n.getFullYear())*12+(d.getMonth()-n.getMonth()),dy=Math.round((d-n)/864e5);return dy<0?"⚠️ Overdue":m<1?"≈ "+dy+"d":("≈ "+m+" mo"+(m!==1?"s":""))})()+'</span>':'Not set')+'</strong></div>'+
     '</div></div>'+
