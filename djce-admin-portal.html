@@ -10443,6 +10443,7 @@ function openNewClient(){
     '<div class="field"><label>AC Usage Frequency</label><select id="nc_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(u=>'<option>'+u.label+'</option>').join('')+
     '</select></div>'+
+    '<div class="field"><label>💰 Last Transaction Amount (₱)</label><input type="number" id="nc_amount" placeholder="0.00" min="0" step="0.01"></div>'+
     '</div>'+
     '<div class="field form-full" style="margin-top:6px"><label>Notes (unit info, brand, etc.)</label>'+richNotesEditor('nc_notes','')+'</div>'+
     locationInfoFields('nc',{});
@@ -10978,6 +10979,7 @@ function editClientModal(id){
     '<div class="field"><label>AC Usage Frequency</label><select id="ec_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(function(u){return '<option'+(c.usage===u.label?' selected':'')+'>'+u.label+'</option>';}).join('')+
     '</select></div>'+
+    '<div class="field"><label>💰 Last Transaction Amount (₱)</label><input type="number" id="ec_amount" value="'+(c.lastAmount||'')+'" placeholder="0.00" min="0" step="0.01"></div>'+
     '</div>'+
     '<div class="field form-full" style="margin-top:6px"><label>Notes (unit info, brand, etc.)</label>'+richNotesEditor('ec_notes',c.notes||'')+'</div>'+
     locationInfoFields('ec',c);
