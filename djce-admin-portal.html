@@ -4903,7 +4903,7 @@ function renderLogistics(){
       var count = byArea[area]?byArea[area].length:0;
       var isTodays = days.indexOf(todayDay)!==-1;
       var allDays=['Mon','Tue','Wed','Thu','Fri','Sat'];
-      var canEdit = CUR_USER && (CUR_USER.role==='owner'||CUR_USER.role==='admin');
+      var canEdit = session && (session.role==='owner'||session.role==='admin');
       return '<tr style="'+(isTodays?'background:var(--accent-soft)':'')+'">'+
         '<td><strong>'+area+'</strong>'+(isTodays?' <span style="color:var(--accent);font-size:10px">TODAY</span>':'')+'</td>'+
         allDays.map(function(d){
