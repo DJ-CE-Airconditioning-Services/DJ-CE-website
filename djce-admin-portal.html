@@ -6355,7 +6355,7 @@ function buildRevenueContent(from, to) {
     <div class="panel-body">
       <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px">Generate BIR-friendly payslips for the team. All fields are editable before printing.</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
-        ${Object.entries(TEAM_RATES).map(function(e){var name=e[0],info=e[1];return '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s" data-member="'+name+'" onclick="openPayslip(this.dataset.member)" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+'<div style="font-size:22px;margin-bottom:6px">👷</div>'+'<div style="font-weight:700;font-size:13px">'+name+'</div>'+'<div style="font-size:11px;color:var(--accent);margin-top:2px">'+info.label+'</div>'+'<div style="font-size:10.5px;color:var(--text-dim);margin-top:6px">'+info.note+'</div>'+'<div class="btn btn-primary btn-xs" style="margin-top:10px;display:inline-flex">📄 Generate Payslip</div></div>';}).join('')}
+        ${ACCT_EMPLOYEES.length ? ACCT_EMPLOYEES.map(function(emp){var typeLabel=emp.type==='fixed'?'Fixed':emp.type==='commission'?'Commission':emp.type==='oncall'?'On-call':emp.type==='investor'?'Investor':emp.type||'—';return '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s" data-empid="'+emp.id+'" onclick="openPayslip(this.dataset.empid)" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+'<div style="font-size:22px;margin-bottom:6px">👷</div>'+'<div style="font-weight:700;font-size:13px">'+emp.name+'</div>'+'<div style="font-size:11px;color:var(--accent);margin-top:2px">'+typeLabel+' · '+(emp.role||'—')+'</div>'+'<div style="font-size:10.5px;color:var(--text-dim);margin-top:6px">₱'+(parseFloat(emp.dailyRate)||0).toLocaleString()+'/day'+(parseFloat(emp.mealAllowance)?', ₱'+parseFloat(emp.mealAllowance).toLocaleString()+' meal':'')+'</div>'+'<div class="btn btn-primary btn-xs" style="margin-top:10px;display:inline-flex">📄 Generate Payslip</div></div>';}).join('') : '<div class="empty" style="padding:20px;grid-column:1/-1"><div class="empty-ic">👥</div>No employees yet. Add employees in the Accounting tab first.</div>'}
       </div>
     </div>
   </div>`;
@@ -6444,29 +6444,31 @@ function syncExpenseToSheets(e) {
 
 let currentPayslipData = {};
 
-function openPayslip(memberName) {
-  const info = TEAM_RATES[memberName] || {};
+function openPayslip(empId) {
+  const emp = ACCT_EMPLOYEES.find(function(x){return x.id===empId;});
+  if (!emp) { showToast('Employee not found','warning'); return; }
+  window._currentPayslipEmpId = empId;
   const now = new Date();
   const periodStart = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
   const periodEnd   = now.toISOString().split('T')[0];
 
   // Count jobs done this month for this technician
   const jobsDone = Object.values(BOOKINGS).filter(b=>
-    b.status==='Done' && b.technician===memberName &&
+    b.status==='Done' && b.technician===emp.name &&
     b.date && b.date>=periodStart && b.date<=periodEnd
   ).length;
 
-  const defaultDays = info.type==='driver' ? 4 : jobsDone || 0;
+  const defaultDays = jobsDone || 0;
   const defaultOT   = 0;
-  const dailyRate   = info.dailyRate || 0;
-  const foodDed     = info.food || 0;
-  const otRate      = info.otRate || 0;
+  const dailyRate   = parseFloat(emp.dailyRate) || 0;
+  const foodDed     = parseFloat(emp.mealAllowance) || 0;
+  const otRate      = 0;
 
-  document.getElementById('psTitle').textContent = `Payslip — ${memberName}`;
+  document.getElementById('psTitle').textContent = `Payslip — ${emp.name}`;
   document.getElementById('psBody').innerHTML = `
     <div class="form-grid">
-      <div class="field"><label>Name</label><input id="ps_name" value="${memberName}"></div>
-      <div class="field"><label>Role</label><input id="ps_role" value="${info.label||''}" readonly></div>
+      <div class="field"><label>Name</label><input id="ps_name" value="${emp.name}"></div>
+      <div class="field"><label>Role</label><input id="ps_role" value="${emp.role||''}" readonly></div>
       <div class="field"><label>Period From</label><input type="date" id="ps_from" value="${periodStart}" onchange="previewPayslip()"></div>
       <div class="field"><label>Period To</label><input type="date" id="ps_to" value="${periodEnd}" onchange="previewPayslip()"></div>
       <div class="field"><label>Days Worked</label><input type="number" id="ps_days" value="${defaultDays}" min="0" oninput="previewPayslip()"></div>
@@ -6482,9 +6484,28 @@ function openPayslip(memberName) {
     <div id="psPreview" style="margin-top:14px"></div>`;
   document.getElementById('psFoot').innerHTML = `
     <button class="btn btn-outline btn-sm" onclick="closeModal('payslipModal')">Close</button>
+    <button class="btn btn-primary btn-sm" onclick="savePayslipToEmployee()">💾 Save Changes</button>
     <button class="btn btn-gold btn-sm" onclick="generatePayslipPDF()">⬇️ Download PDF</button>`;
   openModal('payslipModal');
   previewPayslip();
+}
+
+function savePayslipToEmployee() {
+  var empId = window._currentPayslipEmpId;
+  if (!empId) { showToast('No employee linked','error'); return; }
+  var emp = ACCT_EMPLOYEES.find(function(x){return x.id===empId;});
+  if (!emp) { showToast('Employee not found','error'); return; }
+
+  var newName = document.getElementById('ps_name')?.value||emp.name;
+  var newRate = parseFloat(document.getElementById('ps_rate')?.value)||0;
+  var newFood = parseFloat(document.getElementById('ps_food')?.value)||0;
+
+  emp.name = newName;
+  emp.dailyRate = newRate;
+  emp.mealAllowance = newFood;
+
+  saveAcctData();
+  showToast('Employee details saved!','success');
 }
 
 function previewPayslip() {
