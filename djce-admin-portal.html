@@ -7559,6 +7559,19 @@ function openEditEmployee(editId) {
     +'<div class="field"><label>Type *</label><select id="emp_type">'
     +['fixed','commission','oncall','investor'].map(function(t){return '<option value="'+t+'" '+(e&&e.type===t?'selected':'')+'>'+t+'</option>';}).join('')
     +'</select></div>'
+    +'<div class="field form-full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="font-weight:700;color:var(--accent)">👤 Personal Information</label></div>'
+    +'<div class="field"><label>Date of Birth</label><input type="date" id="emp_bday" value="'+(e?e.birthday||'':'')+'" onchange="if(this.value){var a=Math.floor((Date.now()-new Date(this.value).getTime())/31557600000);document.getElementById(\'emp_age\').value=a>0?a:\'\'}"></div>'
+    +'<div class="field"><label>Age</label><input type="number" id="emp_age" value="'+(e&&e.birthday?Math.floor((Date.now()-new Date(e.birthday).getTime())/31557600000):'')+'" readonly style="background:var(--bg-elev2)"></div>'
+    +'<div class="field form-full"><label>Address</label><input id="emp_address" value="'+(e?e.address||'':'')+'" placeholder="Complete address"></div>'
+    +'<div class="field"><label>Contact Number</label><input id="emp_contact" value="'+(e?e.contactNumber||'':'')+'" placeholder="09XX XXX XXXX"></div>'
+    +'<div class="field"><label>Emergency Contact Name</label><input id="emp_emergency_name" value="'+(e?e.emergencyName||'':'')+'" placeholder="Name & relationship"></div>'
+    +'<div class="field"><label>Emergency Contact Number</label><input id="emp_emergency_num" value="'+(e?e.emergencyNumber||'':'')+'" placeholder="09XX XXX XXXX"></div>'
+    +'<div class="field form-full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="font-weight:700;color:var(--accent)">🏛️ Government IDs</label></div>'
+    +'<div class="field"><label>SSS Number</label><input id="emp_sss" value="'+(e?e.sss||'':'')+'" placeholder="XX-XXXXXXX-X"></div>'
+    +'<div class="field"><label>PhilHealth Number</label><input id="emp_philhealth" value="'+(e?e.philhealth||'':'')+'" placeholder="XX-XXXXXXXXX-X"></div>'
+    +'<div class="field"><label>Pag-IBIG Number</label><input id="emp_pagibig" value="'+(e?e.pagibig||'':'')+'" placeholder="XXXX-XXXX-XXXX"></div>'
+    +'<div class="field"><label>TIN</label><input id="emp_tin" value="'+(e?e.tin||'':'')+'" placeholder="XXX-XXX-XXX-XXX"></div>'
+    +'<div class="field form-full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="font-weight:700;color:var(--accent)">💼 Employment Details</label></div>'
     +'<div class="field"><label>Daily Rate (₱)</label><input type="number" id="emp_rate" value="'+(e?e.dailyRate||'':'')+'" placeholder="0" min="0"></div>'
     +'<div class="field"><label>Meal Allowance (₱/day)</label><input type="number" id="emp_meal" value="'+(e?e.mealAllowance||'':'')+'" placeholder="0" min="0"></div>'
     +'<div class="field"><label>Linked Portal Account</label><select id="emp_username"><option value="">— None —</option>'
@@ -7586,6 +7599,15 @@ function saveEmployee(editId) {
     name: name,
     role: role,
     type: document.getElementById('emp_type').value,
+    birthday: (document.getElementById('emp_bday').value||'').trim(),
+    address: (document.getElementById('emp_address').value||'').trim(),
+    contactNumber: (document.getElementById('emp_contact').value||'').trim(),
+    emergencyName: (document.getElementById('emp_emergency_name').value||'').trim(),
+    emergencyNumber: (document.getElementById('emp_emergency_num').value||'').trim(),
+    sss: (document.getElementById('emp_sss').value||'').trim(),
+    philhealth: (document.getElementById('emp_philhealth').value||'').trim(),
+    pagibig: (document.getElementById('emp_pagibig').value||'').trim(),
+    tin: (document.getElementById('emp_tin').value||'').trim(),
     dailyRate: parseFloat(document.getElementById('emp_rate').value)||0,
     mealAllowance: parseFloat(document.getElementById('emp_meal').value)||0,
     accountUsername: (document.getElementById('emp_username').value||'').trim(),
