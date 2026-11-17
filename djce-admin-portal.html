@@ -6708,10 +6708,11 @@ function renderReports() {
     </select>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <label style="font-size:11px;color:var(--text-dim);white-space:nowrap;">Prepared by:</label>
-      <select id="rptPreparedBy" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;outline:none;cursor:pointer;max-width:140px;">
-        <option value="${session?.name||'Owner'}">${session?.name||'Owner'}</option>
-        ${ACCT_EMPLOYEES.map(function(e){return '<option value="'+e.name+'">'+e.name+'</option>';}).join('')}
-      </select>
+      <input list="rptPreparerList" id="rptPreparedBy" value="${session?.name||'Owner'}" placeholder="Type or select name" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;outline:none;width:150px;">
+      <datalist id="rptPreparerList">
+        <option value="${session?.name||'Owner'}">
+        ${ACCT_EMPLOYEES.map(function(e){return '<option value="'+e.name+'">';}).join('')}
+      </datalist>
       <button class="btn btn-gold btn-sm" onclick="generateMonthlyReportPDF()">📥 Download PDF</button>
     </div>
   </div>
