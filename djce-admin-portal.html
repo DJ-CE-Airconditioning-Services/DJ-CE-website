@@ -1298,7 +1298,8 @@ const UNIT_ILLUSTRATIONS = {
 };
 const DJCE_BIZ = {name:'DJ-CE Air-conditioning Services',dti:'Business Name No. 5947985',bir:'TIN: ____________',address:'87 Purok 2, Iba O Este, Calumpit, Bulacan',phone:'0967 004 2636',email:'djceservicesforyou@gmail.com',fb:'DJ-CE Air-conditioning Services',tagline:'We serve with quality and care!'};
 const SERVICES = ['Aircon Cleaning','Aircon Installation','AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works','Plumbing','Others'];
-const SERVICE_AREAS = ['Calumpit','Malolos','Balagtas','Guiguinto','Bocaue','Pulilan','Plaridel','San Miguel','Apalit','Sto. Tomas','Angeles','San Fernando'];
+var SERVICE_AREAS = JSON.parse(localStorage.getItem('djce_service_areas')||'null') || ['Calumpit','Malolos','Balagtas','Guiguinto','Bocaue','Pulilan','Plaridel','San Miguel','Apalit','Sto. Tomas','Angeles','San Fernando'];
+function saveServiceAreas(){ localStorage.setItem('djce_service_areas', JSON.stringify(SERVICE_AREAS)); }
 const SERVICE_TIERS = [
   {value:'Normal', label:'🟢 Normal', color:'var(--success)', desc:'Regular scheduling'},
   {value:'VIP', label:'⭐ VIP', color:'var(--accent)', desc:'Priority client — additional fee'},
@@ -3726,8 +3727,51 @@ function renderSchedule() {
           </div>
         </div>
       </div>
+      <!-- Manage Service Areas -->
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head">
+          <div class="panel-title">🗺️ Manage Service Areas</div>
+          <button class="btn btn-outline btn-xs" onclick="promptAddServiceArea()">➕ Add Area</button>
+        </div>
+        <div class="panel-body" style="padding:12px 14px;">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;" id="serviceAreaTags">
+            ${SERVICE_AREAS.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">'+a+'<button onclick="removeServiceArea(\''+a+'\')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;" title="Remove">×</button></span>';}).join('')}
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:8px;">Click × para alisin. I-add ang mga bagong service area gamit ang button sa taas.</div>
+        </div>
+      </div>
     </div>` : ''}
   </div>`;
+}
+
+function promptAddServiceArea(){
+  var name=prompt('Enter new Service Area name:');
+  if(!name||!name.trim()) return;
+  name=name.trim();
+  if(SERVICE_AREAS.indexOf(name)!==-1){showToast(name+' already exists','error');return;}
+  SERVICE_AREAS.push(name);
+  SERVICE_AREAS.sort();
+  saveServiceAreas();
+  // Also add to AREA_SCHEDULE with empty days
+  if(!AREA_SCHEDULE[name]) AREA_SCHEDULE[name]=[];
+  saveAreaSchedule();
+  showToast(name+' added! ✅','success');
+  // Re-render
+  var view=document.getElementById('view-schedule');
+  if(view) view.innerHTML=renderView('schedule');
+  switchSchedTab('slots');
+}
+
+function removeServiceArea(name){
+  if(!confirm('Remove "'+name+'" from Service Areas?')) return;
+  SERVICE_AREAS=SERVICE_AREAS.filter(function(a){return a!==name;});
+  saveServiceAreas();
+  // Also remove from AREA_SCHEDULE
+  if(AREA_SCHEDULE[name]){delete AREA_SCHEDULE[name]; saveAreaSchedule();}
+  showToast(name+' removed','success');
+  var view=document.getElementById('view-schedule');
+  if(view) view.innerHTML=renderView('schedule');
+  switchSchedTab('slots');
 }
 
 function switchSchedTab(tab) {
@@ -3865,6 +3909,7 @@ function renderSlotSidePanel(dateStr){
           +'<div style="font-size:13px;font-weight:700;color:var(--accent);">🕐 '+(s.label||s.timeSlot)+'</div>'
           +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+statusBg+';color:'+statusColor+';">'+s.status+'</span>'
         +'</div>'
+        +(s.place?'<div style="font-size:11px;color:var(--info);margin-bottom:6px;">📍 '+s.place+'</div>':'')
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
           +'<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;max-width:120px;"><div style="height:100%;width:'+pct+'%;background:'+(isFull?'var(--danger)':'var(--success)')+';border-radius:3px;"></div></div>'
           +'<span style="font-size:11px;color:var(--text-dim);">'+s.currentBookings+'/'+s.maxBookings+' booked'+(s.notes?' · '+s.notes:'')+'</span>'
@@ -3883,8 +3928,12 @@ function renderSlotSidePanel(dateStr){
   }
 
   // Add New Slot form
+  var placeOpts=SERVICE_AREAS.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('');
   html+='<div style="border-top:1.5px solid var(--border);margin-top:12px;padding-top:14px;">'
     +'<div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">➕ Add New Slot</div>'
+    +'<div class="field" style="margin-bottom:8px;"><label style="font-size:11px;">📍 Place / Area</label>'
+      +'<select id="slotPlace" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;">'
+      +'<option value="">— Select Place —</option>'+placeOpts+'</select></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
       +'<div class="field"><label style="font-size:11px;">Start Time</label>'
         +'<input type="time" id="slotStartTime" value="09:00" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:12px;"></div>'
@@ -3973,8 +4022,10 @@ function openEditSlotModal(slotId){
     startT=String(h1).padStart(2,'0')+':'+m1;
     endT=String(h2).padStart(2,'0')+':'+m2;
   }
+  var editPlaceOpts=SERVICE_AREAS.map(function(a){return '<option value="'+a+'"'+(a===(s.place||'')?' selected':'')+'>'+a+'</option>';}).join('');
   showModal('Edit Slot','✏️ '+s.date+' · '+(s.label||s.timeSlot),
     '<div class="form-grid">'
+    +'<div class="field" style="grid-column:1/-1"><label>📍 Place / Area</label><select id="editSlotPlace"><option value="">— Select Place —</option>'+editPlaceOpts+'</select></div>'
     +'<div class="field"><label>Start Time</label><input type="time" id="editSlotStart" value="'+startT+'"></div>'
     +'<div class="field"><label>End Time</label><input type="time" id="editSlotEnd" value="'+endT+'"></div>'
     +'<div class="field"><label>Max Bookings</label><input type="number" id="editSlotMax" value="'+(s.maxBookings||2)+'" min="1" max="20"></div>'
@@ -3990,6 +4041,7 @@ function openEditSlotModal(slotId){
 async function saveEditSlot(slotId){
   var s=SCHEDULE_SLOTS.find(function(x){return x.slotId===slotId;});
   if(!s) return;
+  var place=document.getElementById('editSlotPlace')?.value||'';
   var startT=document.getElementById('editSlotStart').value;
   var endT=document.getElementById('editSlotEnd').value;
   var max=parseInt(document.getElementById('editSlotMax').value)||2;
@@ -4002,10 +4054,10 @@ async function saveEditSlot(slotId){
     // Delete old, create new with same date
     var res=await callSheets({action:'deleteSlot',data:encodeURIComponent(JSON.stringify({slotId:slotId}))});
     var res2=await callSheets({action:'openSlot',data:encodeURIComponent(JSON.stringify({
-      date:s.date,timeSlot:newLabel,maxBookings:max,notes:notes,createdBy:session.name
+      date:s.date,timeSlot:newLabel,maxBookings:max,notes:notes,place:place,createdBy:session.name
     }))},15000);
     if(res2&&res2.ok){
-      s.timeSlot=newLabel;s.label=newLabel;s.time=newLabel;s.maxBookings=max;s.notes=notes;
+      s.timeSlot=newLabel;s.label=newLabel;s.time=newLabel;s.maxBookings=max;s.notes=notes;s.place=place;
       s.remaining=max-(s.currentBookings||0);
       if(res2.slotId) s.slotId=res2.slotId;
       showToast('Slot updated! ✅','success');
@@ -4035,11 +4087,13 @@ function formatTime12(t24) {
 
 async function openNewSlot() {
   const date  = _slotCalSelectedDate || document.getElementById('slotDate')?.value;
+  const place = document.getElementById('slotPlace')?.value||'';
   const startT = document.getElementById('slotStartTime')?.value;
   const endT   = document.getElementById('slotEndTime')?.value;
   const max   = parseInt(document.getElementById('slotMax')?.value)||2;
   const notes = document.getElementById('slotNotes')?.value||'';
   if (!date) { showToast('Select a date sa calendar muna','error'); return; }
+  if (!place) { showToast('Pumili muna ng Place / Area','error'); return; }
   if (!startT||!endT) { showToast('Set start and end time','error'); return; }
   if (startT >= endT) { showToast('End time must be after start time','error'); return; }
 
@@ -4048,18 +4102,18 @@ async function openNewSlot() {
   showToast('Opening slot...','info');
   try {
     const res = await callSheets({ action:'openSlot', data: encodeURIComponent(JSON.stringify({
-      date, timeSlot: timeLabel, maxBookings: max, notes, createdBy: session.name
+      date, timeSlot: timeLabel, maxBookings: max, notes, place, createdBy: session.name
     }))}, 15000);
     if (res && res.ok) {
-      const existing = SCHEDULE_SLOTS.find(s=>s.date===date&&s.timeSlot===timeLabel);
+      const existing = SCHEDULE_SLOTS.find(s=>s.date===date&&s.timeSlot===timeLabel&&(s.place||'')===(place||''));
       if (existing) {
-        existing.status='Open'; existing.maxBookings=max; existing.notes=notes;
+        existing.status='Open'; existing.maxBookings=max; existing.notes=notes; existing.place=place;
         existing.remaining=max-existing.currentBookings;
       } else {
-        SCHEDULE_SLOTS.push({slotId:res.slotId||('SL-'+Date.now()),date,timeSlot:timeLabel,label:timeLabel,time:timeLabel,maxBookings:max,currentBookings:0,remaining:max,status:'Open',notes});
+        SCHEDULE_SLOTS.push({slotId:res.slotId||('SL-'+Date.now()),date,timeSlot:timeLabel,label:timeLabel,time:timeLabel,maxBookings:max,currentBookings:0,remaining:max,status:'Open',notes,place});
       }
       showToast('Slot opened! ✅','success');
-      logActivity('🗓️','Opened slot: '+date+' '+timeLabel+' (max '+max+')','schedule');
+      logActivity('🗓️','Opened slot: '+date+' '+timeLabel+' @ '+place+' (max '+max+')','schedule');
       renderSlotCalendar();
       if(_slotCalSelectedDate) renderSlotSidePanel(_slotCalSelectedDate);
       var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
@@ -4071,11 +4125,13 @@ async function openNewSlot() {
 
 async function openWeekSlots() {
   const date  = _slotCalSelectedDate || document.getElementById('slotDate')?.value;
+  const place = document.getElementById('slotPlace')?.value||'';
   const startT = document.getElementById('slotStartTime')?.value;
   const endT   = document.getElementById('slotEndTime')?.value;
   const max   = parseInt(document.getElementById('slotMax')?.value)||2;
   const notes = document.getElementById('slotNotes')?.value||'';
   if (!date) { showToast('Select a start date sa calendar','error'); return; }
+  if (!place) { showToast('Pumili muna ng Place / Area','error'); return; }
   if (!startT||!endT) { showToast('Set start and end time','error'); return; }
   if (startT >= endT) { showToast('End time must be after start time','error'); return; }
 
@@ -4089,19 +4145,19 @@ async function openWeekSlots() {
     const dateStr = dt.toISOString().split('T')[0];
     try {
       const res = await callSheets({ action:'openSlot', data: encodeURIComponent(JSON.stringify({
-        date:dateStr, timeSlot:timeLabel, maxBookings:max, notes, createdBy:session.name
+        date:dateStr, timeSlot:timeLabel, maxBookings:max, notes, place, createdBy:session.name
       }))}, 15000);
       if (res && res.ok) {
-        const existing = SCHEDULE_SLOTS.find(s=>s.date===dateStr&&s.timeSlot===timeLabel);
+        const existing = SCHEDULE_SLOTS.find(s=>s.date===dateStr&&s.timeSlot===timeLabel&&(s.place||'')===(place||''));
         if (!existing) {
-          SCHEDULE_SLOTS.push({slotId:res.slotId||('SL-'+Date.now()+'-'+d),date:dateStr,timeSlot:timeLabel,label:timeLabel,time:timeLabel,maxBookings:max,currentBookings:0,remaining:max,status:'Open',notes});
-        } else { existing.status='Open'; existing.maxBookings=max; }
+          SCHEDULE_SLOTS.push({slotId:res.slotId||('SL-'+Date.now()+'-'+d),date:dateStr,timeSlot:timeLabel,label:timeLabel,time:timeLabel,maxBookings:max,currentBookings:0,remaining:max,status:'Open',notes,place});
+        } else { existing.status='Open'; existing.maxBookings=max; existing.place=place; }
         opened++;
       }
     } catch(e) {}
   }
   showToast('Opened '+opened+' slots for 7 days! ✅','success');
-  logActivity('🗓️','Opened week of slots from '+date+' '+timeLabel+' (max '+max+'/slot)','schedule');
+  logActivity('🗓️','Opened week of slots from '+date+' '+timeLabel+' @ '+place+' (max '+max+'/slot)','schedule');
   renderSlotCalendar();
   if(_slotCalSelectedDate) renderSlotSidePanel(_slotCalSelectedDate);
   var sumBody=document.getElementById('slotSummaryBody'); if(sumBody) sumBody.innerHTML=buildSlotSummaryHtml();
