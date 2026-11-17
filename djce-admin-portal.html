@@ -6706,6 +6706,7 @@ function renderReports() {
     <select id="rptMonth" onchange="refreshReports()" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;outline:none;cursor:pointer">
       ${getMonthOptions()}
     </select>
+    <button class="btn btn-gold btn-sm" onclick="generateMonthlyReportPDF()" style="margin-left:auto;">📥 Download PDF</button>
   </div>
   ${renderRevenueChart()}
   ${contentHtml}`;
