@@ -269,34 +269,45 @@ section{padding:80px 40px;}
 .pin-map-wrap iframe{width:100%;height:180px;border:none;display:block;}
 
 /* services checkboxes */
-.svc-options{display:grid;gap:8px;}
-.svc-cat-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray);margin:12px 0 6px;}
-.svc-item{
-  border:1.5px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 14px;
-  cursor:pointer;transition:all .15s;user-select:none;
+.svc-entry-card{
+  border:1.5px solid rgba(255,255,255,0.15);border-radius:12px;padding:14px 16px;
+  background:rgba(255,255,255,0.04);margin-bottom:10px;transition:all .15s;
 }
-.svc-item:hover{border-color:var(--sky);background:rgba(59,130,246,0.08);}
-.svc-item.sel{border-color:var(--sky);background:rgba(59,130,246,0.12);}
-.svc-item input[type=checkbox]{display:none;}
-.svc-header{display:flex;align-items:center;gap:10px;}
-.svc-check{
-  width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-radius:6px;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;
+.svc-entry-card:hover{border-color:rgba(59,130,246,0.3);}
+.svc-entry-top{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.svc-entry-num{
+  width:26px;height:26px;border-radius:50%;background:var(--sky);color:#fff;
+  font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
-.svc-item.sel .svc-check{background:var(--sky);border-color:var(--sky);}
-.svc-check-inner{display:none;color:white;font-size:12px;font-weight:700;}
-.svc-item.sel .svc-check-inner{display:block;}
-.svc-name{font-size:14px;font-weight:600;color:rgba(255,255,255,0.9);}
-.svc-sub{margin-top:10px;display:none;}
-.svc-item.sel .svc-sub{display:grid;gap:8px;grid-template-columns:1fr 1fr;}
-.svc-sub select,.svc-sub input{
+.svc-entry-top select{
+  flex:1;padding:10px 12px;border:1.5px solid rgba(255,255,255,0.15);border-radius:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:#fff;background:rgba(255,255,255,0.08);
+  outline:none;transition:border .15s;
+}
+.svc-entry-top select option{background:#0d1f3c;color:#fff;}
+.svc-entry-top select:focus{border-color:var(--sky);}
+.svc-entry-rm{
+  background:rgba(220,38,38,0.15);color:#f87171;border:none;border-radius:8px;
+  width:34px;height:34px;font-size:16px;cursor:pointer;flex-shrink:0;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.svc-entry-rm:hover{background:rgba(220,38,38,0.3);}
+.svc-detail-grid{display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:10px;}
+.svc-detail-grid select,.svc-detail-grid input,.svc-detail-grid textarea{
   padding:9px 12px;border:1.5px solid rgba(255,255,255,0.15);border-radius:8px;
   font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#fff;background:rgba(255,255,255,0.08);
-  width:100%;outline:none;transition:border .15s;
+  width:100%;outline:none;transition:border .15s;box-sizing:border-box;
 }
-.svc-sub select option{background:#0d1f3c;color:#fff;}
-.svc-sub select:focus,.svc-sub input:focus{border-color:var(--sky);}
-.svc-sub.col3{grid-template-columns:1fr 1fr 1fr;}
+.svc-detail-grid select option{background:#0d1f3c;color:#fff;}
+.svc-detail-grid select:focus,.svc-detail-grid input:focus,.svc-detail-grid textarea:focus{border-color:var(--sky);}
+.svc-detail-grid textarea{grid-column:1/-1;min-height:60px;resize:vertical;}
+.svc-add-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;
+  border:1.5px dashed rgba(59,130,246,0.4);border-radius:10px;background:rgba(59,130,246,0.06);
+  color:var(--sky);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .15s;margin-top:4px;
+}
+.svc-add-btn:hover{background:rgba(59,130,246,0.12);border-color:var(--sky);}
 
 .form-submit{
   width:100%;padding:15px;background:linear-gradient(135deg,var(--sky),var(--blue));color:var(--white);border:none;
@@ -872,69 +883,8 @@ footer{
           </div>
 
           <div class="form-section-label">Select Service(s) *</div>
-          <div class="svc-options">
-
-            <div class="svc-cat-label">Aircon Cleaning</div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Aircon Cleaning">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">❄️ Aircon Cleaning</span></div>
-              <div class="svc-sub">
-                <select onclick="event.stopPropagation()"><option value="">Unit type</option><option>Window type</option><option>Split type</option></select>
-                <select onclick="event.stopPropagation()"><option value="">Horsepower</option><option>0.5 HP</option><option>0.75 HP</option><option>1.0 HP</option><option>1.5 HP</option><option>2.0 HP</option><option>2.5 HP</option><option>3.0 HP</option></select>
-              </div>
-            </div>
-
-            <div class="svc-cat-label">AWM Deep Cleaning</div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="AWM Deep Cleaning">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🫧 AWM Deep Cleaning</span></div>
-              <div class="svc-sub col3">
-                <input type="text" placeholder="Brand" onclick="event.stopPropagation()">
-                <select onclick="event.stopPropagation()"><option value="">Kilograms</option><option>5 kg</option><option>6 kg</option><option>7 kg</option><option>8 kg</option><option>9 kg</option><option>10 kg</option><option>11 kg</option><option>12 kg</option></select>
-                <select onclick="event.stopPropagation()"><option value="">Type</option><option>Topload</option><option>Frontload</option></select>
-              </div>
-            </div>
-
-            <div class="svc-cat-label">Aircon Works</div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Aircon Installation">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🛠️ Aircon Installation</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Window Type Installation">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🪟 Window Type Installation</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Aircon Relocation">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🔄 Aircon Relocation</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Aircon Dismantle">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🔨 Aircon Dismantle</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Aircon Bracket">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🔩 Aircon Bracket</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Freon Charging">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🧪 Freon Charging</span></div>
-            </div>
-
-            <div class="svc-cat-label">Electrical & Others</div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Breaker Installation">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">⚡ Breaker Installation</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Electrical Services">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">💡 Electrical Services</span></div>
-            </div>
-            <div class="svc-item" onclick="toggleSvc(this)">
-              <input type="checkbox" value="Plumbing / Tubo">
-              <div class="svc-header"><div class="svc-check"><div class="svc-check-inner">✓</div></div><span class="svc-name">🔧 Plumbing / Tubo</span></div>
-            </div>
-          </div>
+          <div id="wb_svcFields"></div>
+          <button type="button" class="svc-add-btn" onclick="addWbServiceEntry()">＋ Add Another Service</button>
 
           <div class="form-section-label">Preferred Schedule *</div>
           <div class="fgroup">
@@ -1471,10 +1421,126 @@ function showAreaScheduleHint(areaValue) {
   cal.parentNode.insertBefore(hint, cal);
 }
 
-function toggleSvc(el){
-  if(['SELECT','INPUT'].includes(event.target.tagName) && event.target.type!=='checkbox') return;
-  el.classList.toggle('sel');
-  el.querySelector('input[type=checkbox]').checked = el.classList.contains('sel');
+// ── MULTI-SERVICE ENTRY SYSTEM ─────────────────────────────────────────────
+var WB_SERVICES=['Aircon Cleaning','Aircon Installation','AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works','Plumbing','Others'];
+var WB_HP=['0.5 HP','0.75 HP','1.0 HP','1.5 HP','2.0 HP','2.5 HP','3.0 HP','5.0 HP'];
+var WB_AC_BRANDS=['Carrier','Kolin','Midea','Panasonic','LG','Samsung','Sharp','Fujidaire','Condura','Gree','Other'];
+var WB_WM_BRANDS=['Samsung','LG','Whirlpool','Panasonic','Sharp','Condura','Haier','Midea','Other'];
+var WB_WM_CAP=['5 kg','6 kg','7 kg','8 kg','9 kg','10 kg','11 kg','12 kg','13 kg','14 kg','15 kg','16 kg','17 kg','18 kg','19 kg','20 kg','20+ kg'];
+var WB_FLOOR=['Ground Floor','2nd Floor','3rd Floor','4th Floor+','Rooftop'];
+var _wbSvcEntries=[];
+
+function initWbServiceEntries(){
+  _wbSvcEntries=[];
+  addWbServiceEntry();
+}
+
+function addWbServiceEntry(){
+  _wbSvcEntries.push({id:Date.now()+'_'+_wbSvcEntries.length});
+  renderWbServiceEntries();
+}
+
+function removeWbServiceEntry(idx){
+  if(_wbSvcEntries.length<=1){toast('Need at least 1 service','r');return;}
+  _wbSvcEntries.splice(idx,1);
+  renderWbServiceEntries();
+}
+
+function renderWbServiceEntries(){
+  var c=document.getElementById('wb_svcFields');
+  if(!c) return;
+  var h='';
+  _wbSvcEntries.forEach(function(entry,i){
+    var p='wsvc_'+i+'_';
+    var opts='<option value="">— Select a service —</option>';
+    WB_SERVICES.forEach(function(s){
+      var sel=(entry.type===s)?' selected':'';
+      opts+='<option value="'+s+'"'+sel+'>'+s+'</option>';
+    });
+    h+='<div class="svc-entry-card">'+
+      '<div class="svc-entry-top">'+
+        '<span class="svc-entry-num">'+(i+1)+'</span>'+
+        '<select id="'+p+'service" onchange="onWbSvcTypeChange('+i+')">'+opts+'</select>'+
+        (_wbSvcEntries.length>1?'<button type="button" class="svc-entry-rm" onclick="removeWbServiceEntry('+i+')" title="Remove">✕</button>':'')+
+      '</div>'+
+      '<div id="'+p+'details">'+buildWbSvcDetailFields(i,entry.type)+'</div>'+
+    '</div>';
+  });
+  c.innerHTML=h;
+}
+
+function onWbSvcTypeChange(idx){
+  var sel=document.getElementById('wsvc_'+idx+'_service');
+  if(!sel) return;
+  _wbSvcEntries[idx].type=sel.value;
+  var det=document.getElementById('wsvc_'+idx+'_details');
+  if(det) det.innerHTML=buildWbSvcDetailFields(idx,sel.value);
+}
+
+function buildWbSvcDetailFields(idx,svc){
+  if(!svc) return '';
+  var p='wsvc_'+idx+'_';
+  var hp='<select id="'+p+'hp" style="width:100%"><option value="">Horsepower</option>';
+  WB_HP.forEach(function(h){hp+='<option value="'+h+'">'+h+'</option>';});
+  hp+='</select>';
+  var bac='<select id="'+p+'brand" style="width:100%"><option value="">Brand</option>';
+  WB_AC_BRANDS.forEach(function(b){bac+='<option value="'+b+'">'+b+'</option>';});
+  bac+='</select>';
+  var bwm='<select id="'+p+'brand" style="width:100%"><option value="">Brand</option>';
+  WB_WM_BRANDS.forEach(function(b){bwm+='<option value="'+b+'">'+b+'</option>';});
+  bwm+='</select>';
+  var fl='<select id="'+p+'floor" style="width:100%"><option value="">Floor level</option>';
+  WB_FLOOR.forEach(function(f){fl+='<option value="'+f+'">'+f+'</option>';});
+  fl+='</select>';
+  var cap='<select id="'+p+'wmcap" style="width:100%"><option value="">Capacity</option>';
+  WB_WM_CAP.forEach(function(c){cap+='<option value="'+c+'">'+c+'</option>';});
+  cap+='</select>';
+
+  if(svc==='Aircon Cleaning'){
+    return '<div class="svc-detail-grid">'+
+      '<select id="'+p+'actype" style="width:100%"><option value="">Unit type</option><option value="Window type">Window type</option><option value="Split type">Split type</option></select>'+
+      hp+bac+fl+
+    '</div>';
+  }
+  if(svc==='Aircon Installation'){
+    return '<div class="svc-detail-grid">'+
+      '<select id="'+p+'actype" style="width:100%"><option value="">Unit type</option><option value="Window type">Window type</option><option value="Split type">Split type</option></select>'+
+      hp+bac+fl+
+    '</div>';
+  }
+  if(svc==='AWM Deep Clean (Top Load)'||svc==='AWM Deep Clean (Front Load)'){
+    return '<div class="svc-detail-grid">'+bwm+cap+'</div>';
+  }
+  if(svc==='Electrical Works'||svc==='Plumbing'){
+    return '<div class="svc-detail-grid"><textarea id="'+p+'issue" placeholder="Describe the issue or work needed…" style="width:100%"></textarea></div>';
+  }
+  if(svc==='Others'){
+    return '<div class="svc-detail-grid"><textarea id="'+p+'issue" placeholder="Describe the service you need…" style="width:100%"></textarea></div>';
+  }
+  return '';
+}
+
+function getWbServiceDetails(){
+  var entries=[];
+  var summaryParts=[];
+  _wbSvcEntries.forEach(function(entry,i){
+    var p='wsvc_'+i+'_';
+    var svc=(document.getElementById(p+'service')||{}).value||'';
+    if(!svc) return;
+    function pick(f){var el=document.getElementById(p+f);return el?el.value:'';}
+    var item={service:svc,brand:pick('brand'),hp:pick('hp'),actype:pick('actype'),
+      floor:pick('floor'),wmcap:pick('wmcap'),issue:pick('issue')};
+    entries.push(item);
+    var parts=[svc];
+    if(item.actype)parts.push(item.actype);
+    if(item.hp)parts.push(item.hp);
+    if(item.brand)parts.push(item.brand);
+    if(item.floor)parts.push(item.floor);
+    if(item.wmcap)parts.push(item.wmcap);
+    if(item.issue)parts.push(item.issue.substring(0,50));
+    summaryParts.push(parts.join(' | '));
+  });
+  return {serviceEntries:entries,summary:summaryParts.join(' ⸱ ')};
 }
 
 // Scroll to booking form when clicking Book Now from services section
@@ -1872,8 +1938,8 @@ function joinWaitlist(date, timeSlot) {
   var address = [house, street, barangay, city].filter(Boolean).join(', ');
 
   // Collect selected services
-  var selected = [...document.querySelectorAll('.svc-item.sel')];
-  var svcNames = selected.map(function(el){ return el.querySelector('input[type=checkbox]').value; });
+  var svcData = getWbServiceDetails();
+  var svcNames = (svcData.serviceEntries||[]).filter(function(e){return e.service;}).map(function(e){return e.service;});
   var notes = (document.getElementById('f-notes').value||'').trim();
 
   if (!name) { toast('Please fill in your name in the booking form first, then join the waitlist.','r'); return; }
@@ -1919,6 +1985,8 @@ function joinWaitlist(date, timeSlot) {
 
 // Load slots on page load
 setTimeout(loadAvailableSlots, 500);
+// Init multi-service entries
+initWbServiceEntries();
 function submitForm(){
   const name=document.getElementById('f-name').value.trim();
   const phoneRaw=document.getElementById('f-phone').value.trim();
@@ -1931,7 +1999,8 @@ function submitForm(){
   const city=(citySelect==='other'||citySelect==='Pampanga') ? document.getElementById('f-city-other').value.trim() : citySelect;
   const landmark=document.getElementById('f-landmark').value.trim();
   const date=document.getElementById('f-date').value;
-  const selected=[...document.querySelectorAll('.svc-item.sel')];
+  var svcData=getWbServiceDetails();
+  var validSvc=(svcData.serviceEntries||[]).filter(function(e){return e.service;});
 
   if(!name) return toast('Please enter your name.','r');
   if(!phoneRaw||phoneRaw.length!==10||phoneRaw[0]!=='9') return toast('Please enter a valid 10-digit mobile number.','r');
@@ -1942,21 +2011,28 @@ function submitForm(){
   if(!citySelect) return toast('Please select your city/municipality.','r');
   if(!city) return toast('Please specify your city/municipality.','r');
   if(!landmark) return toast('Please enter a specific landmark.','r');
-  if(!selected.length) return toast('Please select at least one service.','r');
+  if(!validSvc.length) return toast('Please select at least one service.','r');
   if(!date||!selectedSlot) return toast('Please select a schedule slot.','r');
 
   const address=house+', '+street+', Brgy. '+barangay+', '+city;
-  const services=selected.map(el=>{
-    const n=el.querySelector('input[type=checkbox]').value;
-    const subs=[...el.querySelectorAll('.svc-sub select,.svc-sub input')].map(s=>s.value).filter(Boolean);
-    return {name:n,details:subs};
+  const services=validSvc.map(function(e){
+    var parts=[e.service];
+    if(e.actype)parts.push(e.actype);
+    if(e.hp)parts.push(e.hp);
+    if(e.brand)parts.push(e.brand);
+    if(e.floor)parts.push(e.floor);
+    if(e.wmcap)parts.push(e.wmcap);
+    if(e.issue)parts.push(e.issue.substring(0,80));
+    return {name:e.service,details:parts.slice(1)};
   });
 
   const bk={
     id:'bk_'+Date.now(),name,phone,email,
     address,
     houseNo:house,street,barangay,city,
-    landmark,lat:pinLat,lng:pinLng,services,date,
+    landmark,lat:pinLat,lng:pinLng,services,
+    serviceDetails:svcData,serviceDetailsSummary:svcData.summary,
+    date,
     time:document.getElementById('f-time').value,
     timeSlot:selectedSlot?selectedSlot.timeSlot:'',
     slotId:document.getElementById('f-slot-id').value,
@@ -2008,7 +2084,7 @@ function resetForm() {
   document.getElementById('f-slot-id').value='';
   document.getElementById('f-lat').value='';
   document.getElementById('f-lng').value='';
-  document.querySelectorAll('.svc-item.sel').forEach(el=>{el.classList.remove('sel');el.querySelector('input').checked=false;});
+  initWbServiceEntries();
   pinLat='';pinLng='';
   const selDiv=document.getElementById('slot-selected'); if(selDiv) selDiv.style.display='none';
   selectedSlot=null;
