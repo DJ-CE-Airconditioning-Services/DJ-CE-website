@@ -1864,7 +1864,7 @@ function buildNav() {
   // Payroll shortcut (goes to Accounting > Payroll subtab)
   if(hasPermission(u,'accounting')){
     h += '<div class="nav-sec">Payroll</div>';
-    h += '<div class="nav-item" data-tip="Payroll" onclick="_acctTab=\'payroll\';switchView(\'accounting\',event)"><span class="ic">💵</span><span class="nav-label">Payroll (Sahod)</span></div>';
+    h += '<div class="nav-item" data-tip="Payroll" onclick="_acctTab=\'payroll\';switchView(\'accounting\',event)"><span class="ic">💵</span><span class="nav-label">Payroll</span></div>';
   }
 
   // System — always show
@@ -6817,11 +6817,13 @@ function openAddExpense(editId) {
         </select>
       </div>
       <div class="field form-full"><label>Related Job(s)</label>
-        <div id="exp_jobs_wrap" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:var(--bg-elev2)">
+        <div id="exp_jobs_wrap" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--bg-elev2)">
           ${jobOptions.length ? jobOptions.map(function(b){
             var checked = e && ((e.relatedJobIds && e.relatedJobIds.indexOf(b.id)!==-1) || e.relatedJobId===b.id);
-            return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer"><input type="checkbox" class="exp_job_cb" value="'+b.id+'" '+(checked?'checked':'')+'> '+b.id+' — '+(b.service||'?')+' ('+(b.client||b.name||'?')+')</label>';
-          }).join('') : '<div style="font-size:12px;color:var(--text-dim)">No jobs yet</div>'}
+            return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;padding:6px 8px;cursor:pointer;border-radius:6px;border:1px solid '+(checked?'var(--accent)':'transparent')+';background:'+(checked?'var(--accent-soft)':'transparent')+';margin-bottom:4px;transition:all .15s" onmouseover="this.style.background=\'var(--bg-elev3)\'" onmouseout="this.style.background=this.querySelector(\'input\').checked?\'var(--accent-soft)\':\'transparent\'">'
+            +'<input type="checkbox" class="exp_job_cb" value="'+b.id+'" '+(checked?'checked':'')+' style="width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex-shrink:0">'
+            +'<span>'+b.id+' — '+(b.service||'?')+' <span style="color:var(--text-dim)">('+(b.client||b.name||'?')+')</span></span></label>';
+          }).join('') : '<div style="font-size:12px;color:var(--text-dim);padding:8px">No jobs yet</div>'}
         </div>
       </div>
       <div class="field form-full"><label>Description</label><input id="exp_desc" value="${e?e.description||'':''}" placeholder="e.g. Shell station - Bocaue run"></div>
@@ -8129,9 +8131,7 @@ function openEditEmployee(editId) {
   var html = '<div class="form-grid">'
     +'<div class="field"><label>Name *</label><input id="emp_name" value="'+(e?e.name:'')+'" placeholder="e.g. Juan dela Cruz"></div>'
     +'<div class="field"><label>Role *</label><input id="emp_role" value="'+(e?e.role:'')+'" placeholder="e.g. Head Tech, Helper, Admin"></div>'
-    +'<div class="field"><label>Type *</label><select id="emp_type">'
-    +['fixed','commission','oncall','investor'].map(function(t){return '<option value="'+t+'" '+(e&&e.type===t?'selected':'')+'>'+t+'</option>';}).join('')
-    +'</select></div>'
+    +'<input type="hidden" id="emp_type" value="'+(e?e.type||'fixed':'fixed')+'">'
     +'<div class="field form-full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="font-weight:700;color:var(--accent)">👤 Personal Information</label></div>'
     +'<div class="field"><label>Date of Birth</label><input type="date" id="emp_bday" value="'+(e?e.birthday||'':'')+'" onchange="if(this.value){var a=Math.floor((Date.now()-new Date(this.value).getTime())/31557600000);document.getElementById(\'emp_age\').value=a>0?a:\'\'}"></div>'
     +'<div class="field"><label>Age</label><input type="number" id="emp_age" value="'+(e&&e.birthday?Math.floor((Date.now()-new Date(e.birthday).getTime())/31557600000):'')+'" readonly style="background:var(--bg-elev2)"></div>'
