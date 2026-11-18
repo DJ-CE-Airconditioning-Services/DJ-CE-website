@@ -3151,9 +3151,25 @@ function renderJobs() {
 
 var jobsDailyDate = new Date().toISOString().split('T')[0];
 
+function _shiftDate(dateStr, offset){
+  // Timezone-safe date shift using date parts
+  var parts = dateStr.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  d.setDate(d.getDate() + offset);
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
+
+function _todayStr(){
+  var n = new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+}
+
 function renderJobsDailyView(){
   var selDate = jobsDailyDate;
-  var allBks = Object.values(BOOKINGS).filter(function(b){return b.status!=='Deleted';});
+  var allBks = Object.values(BOOKINGS).filter(function(b){return b.status!=='Deleted'&&b.status!=='Cancelled';});
   var dayBks = allBks.filter(function(b){return b.date===selDate;});
   dayBks.sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
 
@@ -3172,32 +3188,30 @@ function renderJobsDailyView(){
     }
   });
 
-  // Stats
+  // Stats — count ALL jobs with amounts (not just Done) for revenue
   var totalJobs = dayBks.length;
-  var doneJobs = dayBks.filter(function(b){return b.status==='Done';}).length;
-  var totalRev = dayBks.filter(function(b){return b.status==='Done';}).reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
+  var doneJobs = dayBks.filter(function(b){return b.status==='Done'||b.status==='Completed - Rebooked';}).length;
+  var totalRev = dayBks.reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
   var techCount = Object.keys(techGroups).length;
 
-  // Navigation
-  var prevDate = new Date(selDate+'T00:00:00');
-  prevDate.setDate(prevDate.getDate()-1);
-  var nextDate = new Date(selDate+'T00:00:00');
-  nextDate.setDate(nextDate.getDate()+1);
-  var prevStr = prevDate.toISOString().split('T')[0];
-  var nextStr = nextDate.toISOString().split('T')[0];
-  var isT = selDate === new Date().toISOString().split('T')[0];
-  var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(selDate+'T00:00:00').getDay()];
+  // Navigation — timezone-safe
+  var prevStr = _shiftDate(selDate, -1);
+  var nextStr = _shiftDate(selDate, 1);
+  var todayS = _todayStr();
+  var isT = selDate === todayS;
+  var parts = selDate.split('-');
+  var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])).getDay()];
 
-  var html = '<div id="jobCards">';
+  var html = '<div id="jobsDailyContent">';
   // Date nav
   html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap">';
   html += '<div style="display:flex;align-items:center;gap:8px">';
-  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(\''+prevStr+'\')">◀</button>';
-  html += '<input type="date" value="'+selDate+'" onchange="jobsDailyNav(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">';
-  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(\''+nextStr+'\')">▶</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(-1)">◀</button>';
+  html += '<input type="date" id="jobsDailyPicker" value="'+selDate+'" onchange="jobsDailyJump(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">';
+  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(1)">▶</button>';
   html += '</div>';
   html += '<div style="display:flex;align-items:center;gap:8px">';
-  if(!isT) html += '<button class="btn btn-primary btn-xs" onclick="jobsDailyNav(\''+new Date().toISOString().split('T')[0]+'\')">Today</button>';
+  if(!isT) html += '<button class="btn btn-primary btn-xs" onclick="jobsDailyJump(\''+todayS+'\')">Today</button>';
   html += '<span style="font-size:14px;font-weight:700;color:'+(isT?'var(--accent)':'var(--text)')+'">'+dayName+', '+formatDate(selDate)+(isT?' (TODAY)':'')+'</span>';
   html += '</div></div>';
 
@@ -3219,8 +3233,8 @@ function renderJobsDailyView(){
   var techNames = Object.keys(techGroups).sort();
   techNames.forEach(function(tech){
     var jobs = techGroups[tech];
-    var techDone = jobs.filter(function(b){return b.status==='Done';}).length;
-    var techRev = jobs.filter(function(b){return b.status==='Done';}).reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
+    var techDone = jobs.filter(function(b){return b.status==='Done'||b.status==='Completed - Rebooked';}).length;
+    var techRev = jobs.reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
     html += '<div style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
     html += '<div style="padding:10px 14px;background:var(--bg-elev);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">';
     html += '<div style="font-weight:700;font-size:14px">👷 '+escH(tech)+'</div>';
@@ -3232,7 +3246,8 @@ function renderJobsDailyView(){
     // Job rows
     jobs.forEach(function(b){
       var sCls = (b.status||'pending').toLowerCase().replace(/ /g,'-');
-      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+b.id+'\')">';
+      var bid = b.id.replace(/'/g,'');
+      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+bid+'\')">';
       html += '<div style="flex:1;min-width:0">';
       html += '<div style="font-weight:600;font-size:13px">'+escH(b.name||'—')+'</div>';
       html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+' · 📍 '+escH(b.address||'—')+'</div>';
@@ -3254,7 +3269,8 @@ function renderJobsDailyView(){
     html += '</div>';
     unassignedJobs.forEach(function(b){
       var sCls = (b.status||'pending').toLowerCase().replace(/ /g,'-');
-      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+b.id+'\')">';
+      var bid = b.id.replace(/'/g,'');
+      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+bid+'\')">';
       html += '<div style="flex:1;min-width:0">';
       html += '<div style="font-weight:600;font-size:13px">'+escH(b.name||'—')+'</div>';
       html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+'</div>';
@@ -3269,10 +3285,23 @@ function renderJobsDailyView(){
   return html;
 }
 
-function jobsDailyNav(dateStr){
+function jobsDailyNav(offset){
+  jobsDailyDate = _shiftDate(jobsDailyDate, offset);
+  _refreshDailyView();
+}
+function jobsDailyJump(dateStr){
+  if(!dateStr) return;
   jobsDailyDate = dateStr;
-  var cont = document.getElementById('jobCards');
-  if(cont) cont.outerHTML = renderJobsDailyView();
+  _refreshDailyView();
+}
+function _refreshDailyView(){
+  var cont = document.getElementById('jobsDailyContent');
+  if(cont){
+    cont.outerHTML = renderJobsDailyView();
+  } else {
+    // Fallback: re-render whole jobs view
+    switchJobTab('daily');
+  }
 }
 
 function switchJobTab(tab) {
