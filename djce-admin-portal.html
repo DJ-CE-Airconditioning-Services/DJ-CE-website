@@ -2948,7 +2948,7 @@ function openNewBooking(name='',phone='',address='') {
     </div>
     <div id="nb_svcFields"></div>
     <div class="form-grid" style="margin-top:10px">
-      <div class="field"><label>Preferred Date *</label><input type="date" id="nb_date" min="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="field"><label>Preferred Date *</label><input type="date" id="nb_date" ${session.role==='tech'?'min="'+new Date().toISOString().split('T')[0]+'"':''}></div>
       <div class="field"><label>Preferred Time</label>
         <select id="nb_time" onchange="toggleCustomTime(this)"><option>Morning (8AM–12PM)</option><option>Afternoon (1PM–5PM)</option><option>Flexible</option><option value="__custom">Specific Time…</option></select>
         <input type="time" id="nb_time_custom" style="display:none;margin-top:5px" onchange="this.dataset.set='1'">
