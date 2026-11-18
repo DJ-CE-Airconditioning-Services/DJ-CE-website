@@ -1348,7 +1348,16 @@ function getServiceCode(svc) {
 }
 
 let REF_COUNTERS = {}; // cached from Sheets { mmyy: {monthly, total} }
-const OPEX_CATEGORIES = ['Gas / Fuel', 'Payroll', 'Parts & Materials', 'Tricycle / Transport', 'Food Allowance', 'Tools & Equipment', 'Utilities', 'Warranty', 'Other'];
+var OPEX_CATEGORIES = ['Gas / Fuel', 'Payroll', 'Parts & Materials', 'Tricycle / Transport', 'Food Allowance', 'Tools & Equipment', 'Utilities', 'Warranty', 'Household — Food', 'Household — Utilities', 'Household — Transportation', 'Household — Other', 'Other'];
+
+// Household budget config (editable) — stored in localStorage
+var HOUSEHOLD_BUDGETS = {};
+try { HOUSEHOLD_BUDGETS = JSON.parse(localStorage.getItem('djce_household_budgets')||'{}'); } catch(e){}
+if(!HOUSEHOLD_BUDGETS || !Object.keys(HOUSEHOLD_BUDGETS).length){
+  HOUSEHOLD_BUDGETS = { 'Food': 18000, 'Utilities': 5000, 'Transportation': 3000, 'Other': 2000 };
+}
+function saveHouseholdBudgets(){ try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){} }
+function getHouseholdCategories(){ return Object.keys(HOUSEHOLD_BUDGETS); }
 const TEAM_RATES = {
   'Papa (Senior Tech)': { type: 'senior', label: 'Senior Tech', dailyRate: 0, food: 0, otRate: 0, note: 'Family — flexible' },
   'Helper 1':           { type: 'helper', label: 'Helper', dailyRate: 500, food: 100, otRate: 100, note: '₱500/day, -₱100 food = ₱400 net; ₱100 flat OT' },
@@ -1563,6 +1572,7 @@ function init() {
     try { session = JSON.parse(saved); showPortal(); } catch(e) { /* ignore */ }
   }
   loadLocalData();
+  syncHouseholdToOpex();
   window.onclick = (e) => {
     if (!e.target.closest('#notifPanel') && !e.target.closest('.icon-btn')) {
       document.getElementById('notifPanel')?.classList.remove('show');
@@ -1850,6 +1860,12 @@ function buildNav() {
   h += ni('reports','📈','Reports & Charts');
   h += ni('accounting','🧮','Accounting');
   h += ni('unitsales','🏷️','Unit Sales');
+
+  // Payroll shortcut (goes to Accounting > Payroll subtab)
+  if(hasPermission(u,'accounting')){
+    h += '<div class="nav-sec">Payroll</div>';
+    h += '<div class="nav-item" data-tip="Payroll" onclick="_acctTab=\'payroll\';switchView(\'accounting\',event)"><span class="ic">💵</span><span class="nav-label">Payroll (Sahod)</span></div>';
+  }
 
   // System — always show
   h += '<div class="nav-sec">System</div>';
@@ -6674,7 +6690,7 @@ function buildRevenueContent(from, to) {
       return '<tr>'
         +'<td style="font-size:12px">'+formatDate(e.date)+'</td>'
         +'<td><span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">'+e.category+'</span>'+fundBadge+'</td>'
-        +'<td style="font-size:12px">'+(e.description||'—')+(e.relatedJobId?'<div style="font-size:10px;color:var(--accent)">🔗 '+e.relatedJobId+'</div>':'')+'</td>'
+        +'<td style="font-size:12px">'+(e.description||'—')+(e.relatedJobId?'<div style="font-size:10px;color:var(--accent)">🔗 '+e.relatedJobId.split(',').join(', ')+'</div>':'')+'</td>'
         +'<td style="font-weight:700;color:var(--danger)">₱'+parseFloat(e.amount||0).toLocaleString()+'</td>'
         +'<td style="font-size:11.5px;color:var(--text-dim)">'+(e.addedBy||'—')+'</td>'
         +'<td><button class="btn btn-outline btn-xs" onclick="openAddExpense(\''+e.id+'\')" style="margin-right:4px">✏️</button><button class="btn btn-danger btn-xs" onclick="deleteExpense(\''+e.id+'\')">🗑️</button></td>'
@@ -6746,6 +6762,18 @@ function buildRevenueContent(from, to) {
     <div class="panel-body">${expTableHtml}</div>
   </div>
 
+  <!-- Household Budget Tracker -->
+  <div class="panel" style="margin-bottom:18px">
+    <div class="panel-head">
+      <div class="panel-title">🏠 Household Budget Tracker (This Month)</div>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-outline btn-xs" onclick="openHouseholdBudgetSettings()">⚙️ Set Budgets</button>
+        <button class="btn btn-outline btn-xs" onclick="addHouseholdCategory()">➕ Add Category</button>
+      </div>
+    </div>
+    <div class="panel-body">${buildHouseholdTracker()}</div>
+  </div>
+
   <!-- Revenue breakdown table -->
   <div class="panel" style="margin-bottom:18px">
     <div class="panel-head"><div class="panel-title">💰 Revenue Breakdown (Completed Jobs)</div></div>
@@ -6781,15 +6809,20 @@ function openAddExpense(editId) {
       </div>
       <div class="field"><label>Funding Source *</label>
         <select id="exp_fund">
-          <option value="Regular" ${e&&e.fundingSource==='Investor'?'':'selected'}>Regular (DJC Operations)</option>
+          <option value="Regular" ${e&&e.fundingSource==='Regular'||(!e)?'selected':''}>Regular (DJC Operations)</option>
           <option value="Investor" ${e&&e.fundingSource==='Investor'?'selected':''}>Investor-Funded</option>
+          <option value="On-Call" ${e&&e.fundingSource==='On-Call'?'selected':''}>On-Call</option>
+          <option value="Household" ${e&&e.fundingSource==='Household'?'selected':''}>Household</option>
+          <option value="Other" ${e&&e.fundingSource==='Other'?'selected':''}>Other</option>
         </select>
       </div>
-      <div class="field"><label>Related Job</label>
-        <select id="exp_job">
-          <option value="">— None —</option>
-          ${jobOptions.map(function(b){return '<option value="'+b.id+'" '+(e&&e.relatedJobId===b.id?'selected':'')+'>'+b.id+' — '+(b.service||'?')+' ('+(b.client||b.name||'?')+')</option>';}).join('')}
-        </select>
+      <div class="field form-full"><label>Related Job(s)</label>
+        <div id="exp_jobs_wrap" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:var(--bg-elev2)">
+          ${jobOptions.length ? jobOptions.map(function(b){
+            var checked = e && ((e.relatedJobIds && e.relatedJobIds.indexOf(b.id)!==-1) || e.relatedJobId===b.id);
+            return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer"><input type="checkbox" class="exp_job_cb" value="'+b.id+'" '+(checked?'checked':'')+'> '+b.id+' — '+(b.service||'?')+' ('+(b.client||b.name||'?')+')</label>';
+          }).join('') : '<div style="font-size:12px;color:var(--text-dim)">No jobs yet</div>'}
+        </div>
       </div>
       <div class="field form-full"><label>Description</label><input id="exp_desc" value="${e?e.description||'':''}" placeholder="e.g. Shell station - Bocaue run"></div>
       <div class="field"><label>Amount (₱) *</label><input type="number" id="exp_amt" value="${e?e.amount||'':''}" placeholder="0.00" min="0" step="0.01"></div>
@@ -6808,13 +6841,15 @@ function saveExpense(editId) {
   const desc = document.getElementById('exp_desc')?.value||'';
   const ref  = document.getElementById('exp_ref')?.value||'';
   const fund = document.getElementById('exp_fund')?.value||'Regular';
-  const jobId= document.getElementById('exp_job')?.value||'';
+  var jobCbs = document.querySelectorAll('.exp_job_cb:checked');
+  var jobIds = []; jobCbs.forEach(function(cb){jobIds.push(cb.value);});
+  var jobId = jobIds.join(',');
   if (!date||!cat||!amt) { showToast('Fill in Date, Category, and Amount','error'); return; }
   if (editId) {
     const e = EXPENSES.find(x=>x.id===editId);
-    if (e) { Object.assign(e, {date,category:cat,amount:parseFloat(amt),description:desc,ref,fundingSource:fund,relatedJobId:jobId}); }
+    if (e) { Object.assign(e, {date,category:cat,amount:parseFloat(amt),description:desc,ref,fundingSource:fund,relatedJobId:jobId,relatedJobIds:jobIds}); }
   } else {
-    const e = { id:'EXP-'+Date.now(), date, category:cat, amount:parseFloat(amt), description:desc, ref, fundingSource:fund, relatedJobId:jobId, addedBy:session?.name||'', createdAt:new Date().toISOString() };
+    const e = { id:'EXP-'+Date.now(), date, category:cat, amount:parseFloat(amt), description:desc, ref, fundingSource:fund, relatedJobId:jobId, relatedJobIds:jobIds, addedBy:session?.name||'', createdAt:new Date().toISOString() };
     EXPENSES.push(e);
     syncExpenseToSheets(e);
   }
@@ -6841,6 +6876,141 @@ function syncExpenseToSheets(e) {
   callSheets({ action:'saveExpense', data:encodeURIComponent(JSON.stringify(e)) })
     .then(res=>{ if(res&&res.ok) console.log('Expense synced'); })
     .catch(()=>{});
+}
+
+/* ─── Household Budget Tracker ─────────────────── */
+
+function buildHouseholdTracker(){
+  var now = new Date();
+  var yr = now.getFullYear(), mo = now.getMonth()+1;
+  var mFrom = yr+'-'+String(mo).padStart(2,'0')+'-01';
+  var lastDay = new Date(yr,mo,0).getDate();
+  var mTo = yr+'-'+String(mo).padStart(2,'0')+'-'+String(lastDay);
+  var moLabel = now.toLocaleString('default',{month:'long',year:'numeric'});
+
+  // Get household expenses this month
+  var houseExp = EXPENSES.filter(function(e){
+    return e.date && e.date>=mFrom && e.date<=mTo && (e.category||'').indexOf('Household')===0;
+  });
+
+  // Group by subcategory
+  var cats = getHouseholdCategories();
+  var rows = cats.map(function(cat){
+    var catKey = 'Household — '+cat;
+    var spent = houseExp.filter(function(e){return e.category===catKey;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+    var budget = parseFloat(HOUSEHOLD_BUDGETS[cat])||0;
+    var pct = budget>0 ? Math.round((spent/budget)*100) : 0;
+    var over = spent > budget && budget > 0;
+    return {cat:cat, catKey:catKey, spent:spent, budget:budget, pct:pct, over:over};
+  });
+
+  var totalBudget = rows.reduce(function(s,r){return s+r.budget;},0);
+  var totalSpent = rows.reduce(function(s,r){return s+r.spent;},0);
+  var totalPct = totalBudget>0 ? Math.round((totalSpent/totalBudget)*100) : 0;
+
+  if(!cats.length) return '<div class="empty" style="padding:14px"><div class="empty-ic">🏠</div>No household budget categories. Click "Add Category" to start.</div>';
+
+  var html = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">'+moLabel+' — Track household spending vs monthly budget. Over-budget items turn red.</div>';
+  html += rows.map(function(r){
+    var barColor = r.over ? 'var(--danger)' : (r.pct>80 ? 'var(--warning)' : 'var(--success)');
+    var barWidth = Math.min(r.pct, 100);
+    return '<div style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+      +'<span style="font-size:12.5px;font-weight:600">'+r.cat+'</span>'
+      +'<span style="font-size:12px;'+(r.over?'color:var(--danger);font-weight:700':'color:var(--text-dim)')+'">₱'+r.spent.toLocaleString()+' / ₱'+r.budget.toLocaleString()+' ('+r.pct+'%)'+(r.over?' ⚠️ OVER':'')+'</span>'
+      +'</div>'
+      +'<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">'
+      +'<div style="height:100%;width:'+barWidth+'%;background:'+barColor+';border-radius:4px;transition:width .3s"></div>'
+      +'</div></div>';
+  }).join('');
+
+  // Total row
+  var totalColor = totalSpent>totalBudget ? 'var(--danger)' : 'var(--success)';
+  html += '<div style="margin-top:12px;padding:10px 12px;background:var(--bg-elev2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
+    +'<span style="font-weight:700;font-size:13px">📊 Total Household</span>'
+    +'<span style="font-size:14px;font-weight:800;color:'+totalColor+'">₱'+totalSpent.toLocaleString()+' / ₱'+totalBudget.toLocaleString()+' ('+totalPct+'%)</span>'
+    +'</div>';
+
+  return html;
+}
+
+function openHouseholdBudgetSettings(){
+  var cats = getHouseholdCategories();
+  var fieldsHtml = cats.map(function(cat){
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      +'<span style="flex:1;font-size:13px;font-weight:600">'+cat+'</span>'
+      +'<input type="number" class="hb_input" data-cat="'+cat+'" value="'+(HOUSEHOLD_BUDGETS[cat]||0)+'" style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" placeholder="₱ Budget">'
+      +'<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeHouseholdCat(\''+cat+'\')">🗑️</button>'
+      +'</div>';
+  }).join('');
+  document.getElementById('expModalTitle').textContent = '🏠 Household Budget Settings';
+  document.getElementById('expModalBody').innerHTML = '<div style="margin-bottom:12px;font-size:12.5px;color:var(--text-dim)">Set monthly budget per household category (₱/month)</div>'+fieldsHtml;
+  document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
+    +'<button class="btn btn-gold btn-sm" onclick="saveHouseholdBudgetSettings()">💾 Save</button>';
+  openModal('expenseModal');
+}
+
+function saveHouseholdBudgetSettings(){
+  var inputs = document.querySelectorAll('.hb_input');
+  inputs.forEach(function(inp){
+    var cat = inp.getAttribute('data-cat');
+    HOUSEHOLD_BUDGETS[cat] = parseFloat(inp.value)||0;
+  });
+  saveHouseholdBudgets();
+  // Also update OPEX_CATEGORIES to include any new household cats
+  syncHouseholdToOpex();
+  closeModal('expenseModal');
+  showToast('Household budgets saved ✅','success');
+  refreshRevenue();
+}
+
+function addHouseholdCategory(){
+  document.getElementById('expModalTitle').textContent = '➕ Add Household Category';
+  document.getElementById('expModalBody').innerHTML = '<div class="form-grid">'
+    +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Groceries, Maintenance"></div>'
+    +'<div class="field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
+    +'</div>';
+  document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
+    +'<button class="btn btn-gold btn-sm" onclick="saveNewHouseholdCat()">💾 Save</button>';
+  openModal('expenseModal');
+}
+function saveNewHouseholdCat(){
+  var name = (document.getElementById('hb_new_name')?.value||'').trim();
+  if(!name){ showToast('Enter a category name','error'); return; }
+  if(HOUSEHOLD_BUDGETS[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
+  HOUSEHOLD_BUDGETS[name] = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
+  saveHouseholdBudgets();
+  syncHouseholdToOpex();
+  closeModal('expenseModal');
+  showToast('Added: Household — '+name,'success');
+  refreshRevenue();
+}
+
+function removeHouseholdCat(cat){
+  confirm2('Remove Category','Remove household category "'+cat+'"?','🗑️',function(){
+    delete HOUSEHOLD_BUDGETS[cat];
+    saveHouseholdBudgets();
+    syncHouseholdToOpex();
+    closeModal('expenseModal');
+    showToast('Removed: '+cat,'info');
+    refreshRevenue();
+  });
+}
+
+function syncHouseholdToOpex(){
+  // Remove old Household — entries, re-add from HOUSEHOLD_BUDGETS
+  var base = OPEX_CATEGORIES.filter(function(c){return c.indexOf('Household —')!==0;});
+  var otherIdx = base.indexOf('Other');
+  var houseCats = getHouseholdCategories().map(function(c){return 'Household — '+c;});
+  if(otherIdx>-1){
+    // Insert before 'Other'
+    base.splice.apply(base, [otherIdx, 0].concat(houseCats));
+  } else {
+    base = base.concat(houseCats);
+  }
+  // Update in place
+  OPEX_CATEGORIES.length = 0;
+  base.forEach(function(c){OPEX_CATEGORIES.push(c);});
 }
 
 /* ─── Payslip Generator ───────────────────────── */
