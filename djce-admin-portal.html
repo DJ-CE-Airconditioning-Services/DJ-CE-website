@@ -12652,7 +12652,7 @@ function savePriceEntry(svcName){
 }
 
 function removePriceEntry(svcName,idx){
-  confirm2('Remove this price entry?',function(){
+  confirm2('Remove Price Entry','Remove this price entry from the catalog?','🗑️',function(){
     var svc=SERVICE_CATALOG[svcName];
     if(!svc||!svc.priceMatrix) return;
     svc.priceMatrix.splice(idx,1);
@@ -12724,7 +12724,7 @@ function saveTranspoArea(oldName){
 }
 
 function removeTranspoArea(area){
-  confirm2('Remove '+area+' from transpo fee list?',function(){
+  confirm2('Remove Area','Remove '+area+' from transpo fee list?','🗑️',function(){
     delete TRANSPO_FEES[area];
     saveTranspoFees();
     switchView('settings');
