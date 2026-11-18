@@ -2496,6 +2496,12 @@ function openBookingDetail(id) {
     ${session.role!=='tech'?`
     <div class="sec-divider" style="margin-top:16px">Update Booking</div>
     <div class="form-grid">
+      <div class="field"><label>📅 Date</label>
+        <input type="date" id="detDate" value="${b.date||''}" style="width:100%">
+      </div>
+      <div class="field"><label>🕐 Time Slot</label>
+        <input type="time" id="detTime" value="${b.time||''}" style="width:100%">
+      </div>
       <div class="field"><label>Assign Technician(s)</label>
         ${renderTechPicker('detTechPicker',b.technician||'')}
       </div>
@@ -2682,6 +2688,8 @@ function updateBooking(id) {
   const b = BOOKINGS[id];
   if (!b) return;
   const tech     = getTechPickerValue('detTechPicker');
+  const detDate  = document.getElementById('detDate')?.value||'';
+  const detTime  = document.getElementById('detTime')?.value||'';
   const status   = document.getElementById('detStatus')?.value;
   const notes    = document.getElementById('detNotes')?.value;
   // Payment breakdown
@@ -2705,6 +2713,8 @@ function updateBooking(id) {
   if (contactPerson !== undefined) b.contactPerson = contactPerson;
   if (contactPhone !== undefined) b.contactPhone = contactPhone;
 
+  if (detDate) b.date = detDate;
+  if (detTime) b.time = detTime;
   if (tech) b.technician = tech;
   var oldStatus = b.status;
   if (status) b.status = status;
