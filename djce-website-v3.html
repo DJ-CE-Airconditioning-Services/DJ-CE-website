@@ -1422,7 +1422,7 @@ function showAreaScheduleHint(areaValue) {
 }
 
 // ── MULTI-SERVICE ENTRY SYSTEM ─────────────────────────────────────────────
-var WB_SERVICES=['Aircon Cleaning','Aircon Installation','AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works','Plumbing','Others'];
+var WB_SERVICES=['Aircon Cleaning','Aircon Installation','Aircon Relocation','Aircon Dismantle','Freon Charging','Aircon Bracket','AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works','Breaker Installation','Troubleshoot','Plumbing','Others'];
 var WB_HP=['0.5 HP','0.75 HP','1.0 HP','1.5 HP','2.0 HP','2.5 HP','3.0 HP','5.0 HP'];
 var WB_AC_BRANDS=['Carrier','Kolin','Midea','Panasonic','LG','Samsung','Sharp','Fujidaire','Condura','Gree','Other'];
 var WB_WM_BRANDS=['Samsung','LG','Whirlpool','Panasonic','Sharp','Condura','Haier','Midea','Other'];
@@ -1510,6 +1510,28 @@ function buildWbSvcDetailFields(idx,svc){
   }
   if(svc==='AWM Deep Clean (Top Load)'||svc==='AWM Deep Clean (Front Load)'){
     return '<div class="svc-detail-grid">'+bwm+cap+'</div>';
+  }
+  if(svc==='Aircon Relocation'||svc==='Aircon Dismantle'){
+    return '<div class="svc-detail-grid">'+
+      '<select id="'+p+'actype" style="width:100%"><option value="">Unit type</option><option value="Window type">Window type</option><option value="Split type">Split type</option></select>'+
+      hp+bac+fl+
+    '</div>';
+  }
+  if(svc==='Freon Charging'){
+    return '<div class="svc-detail-grid">'+
+      '<select id="'+p+'actype" style="width:100%"><option value="">Unit type</option><option value="Window type">Window type</option><option value="Split type">Split type</option></select>'+
+      hp+bac+
+      '<select id="'+p+'refrig" style="width:100%"><option value="">Refrigerant type</option><option>R22</option><option>R32</option><option>R410A</option></select>'+
+    '</div>';
+  }
+  if(svc==='Aircon Bracket'){
+    return '<div class="svc-detail-grid">'+
+      '<select id="'+p+'actype" style="width:100%"><option value="">Unit type</option><option value="Window type">Window type</option><option value="Split type">Split type</option></select>'+
+      fl+
+    '</div>';
+  }
+  if(svc==='Breaker Installation'||svc==='Troubleshoot'){
+    return '<div class="svc-detail-grid"><textarea id="'+p+'issue" placeholder="Describe the issue or work needed…" style="width:100%"></textarea></div>';
   }
   if(svc==='Electrical Works'||svc==='Plumbing'){
     return '<div class="svc-detail-grid"><textarea id="'+p+'issue" placeholder="Describe the issue or work needed…" style="width:100%"></textarea></div>';
