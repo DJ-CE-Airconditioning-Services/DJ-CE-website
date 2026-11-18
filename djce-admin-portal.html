@@ -2440,6 +2440,7 @@ function openBookingDetail(id) {
         <div class="info-row"><span class="info-label">Time</span><span class="info-val">${b.time||'—'}</span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="status-badge s-${(b.status||'pending').toLowerCase()}">${b.status||'Pending'}</span></span></div>
         <div class="info-row"><span class="info-label">Technician(s)</span><span class="info-val">${techDisplay(b.technician)||'<em style="color:var(--text-dim)">Unassigned</em>'}</span></div>
+        ${b.oncallHelper?'<div class="info-row"><span class="info-label">On Call Helper(s)</span><span class="info-val"><span style="color:var(--info);font-weight:600">🔔 '+escH(b.oncallHelper)+'</span>'+(b.feeOncall?' · <span style="color:var(--danger)">₱'+parseFloat(b.feeOncall).toLocaleString()+'</span>':'')+'</span></div>':''}
         <div class="info-row"><span class="info-label">Amount</span><span class="info-val">
           ${(()=>{
             if (!b.feeService && !b.feeParts && !b.feeTranspo && !b.feeOther && !b.feeDiscount) {
@@ -2450,6 +2451,7 @@ function openBookingDetail(id) {
             if (b.feeParts)    rows.push(`<span style="color:var(--text-dim);font-size:11px">Parts: </span><span>₱${parseFloat(b.feeParts).toLocaleString()}</span>`);
             if (b.feeTranspo)  rows.push(`<span style="color:var(--text-dim);font-size:11px">Transpo: </span><span>₱${parseFloat(b.feeTranspo).toLocaleString()}</span>`);
             if (b.feeOther)    rows.push(`<span style="color:var(--text-dim);font-size:11px">Other: </span><span>₱${parseFloat(b.feeOther).toLocaleString()}</span>`);
+            if (b.feeOncall)   rows.push(`<span style="color:var(--info);font-size:11px">🔔 On Call: </span><span style="color:var(--info)">-₱${parseFloat(b.feeOncall).toLocaleString()}</span>`);
             if (b.feeDiscount) rows.push(`<span style="color:var(--danger);font-size:11px">Discount: </span><span style="color:var(--danger)">-₱${parseFloat(b.feeDiscount).toLocaleString()}</span>`);
             return `<div style="display:flex;flex-direction:column;gap:2px">${rows.join('')}<strong style="color:var(--accent);margin-top:3px;font-size:13px">Total: ₱${b.amount?parseFloat(b.amount).toLocaleString():'—'}</strong></div>`;
           })()}
@@ -2519,6 +2521,9 @@ function openBookingDetail(id) {
       <div class="field"><label>📱 Contact Person Phone</label>
         <input type="tel" id="detContactPhone" value="${b.contactPhone||''}" placeholder="Phone ng aabutan">
       </div>
+      <div class="field"><label>🔔 On Call Helper(s)</label>
+        <input type="text" id="detOncall" value="${b.oncallHelper||''}" placeholder="e.g. Kuya Boy, Mang Jun">
+      </div>
       <div class="field"><label>Notes</label>
         <input type="text" id="detNotes" value="${b.notes||''}" placeholder="Internal notes">
       </div>
@@ -2580,6 +2585,10 @@ function openBookingDetail(id) {
           <input type="number" id="det_other" value="${b.feeOther||''}" min="0" step="0.01" placeholder="0.00" oninput="calcPaymentTotal()">
         </div>
         <div class="field">
+          <label style="color:var(--info)">🔔 On Call Fee (₱) <span style="font-size:10px;color:var(--text-dim)">bayad sa helper — bawas sa net</span></label>
+          <input type="number" id="det_oncallFee" value="${b.feeOncall||''}" min="0" step="0.01" placeholder="0.00" oninput="calcPaymentTotal()">
+        </div>
+        <div class="field">
           <label style="color:var(--danger)">Discount (₱) <span style="font-size:10px;color:var(--text-dim)">less from total</span></label>
           <input type="number" id="det_discount" value="${b.feeDiscount||''}" min="0" step="0.01" placeholder="0.00" oninput="calcPaymentTotal()">
         </div>
@@ -2620,8 +2629,9 @@ function calcPaymentTotal() {
   const parts    = parseFloat(document.getElementById('det_parts')?.value)   || 0;
   const transpo  = parseFloat(document.getElementById('det_transpo')?.value) || 0;
   const other    = parseFloat(document.getElementById('det_other')?.value)   || 0;
+  const oncallFee= parseFloat(document.getElementById('det_oncallFee')?.value)||0;
   const discount = parseFloat(document.getElementById('det_discount')?.value)|| 0;
-  const total    = svc + parts + transpo + other - discount;
+  const total    = svc + parts + transpo + other - oncallFee - discount;
   const totalEl  = document.getElementById('det_total_display');
   const hiddenEl = document.getElementById('detAmount');
   if (totalEl) totalEl.textContent = '₱'+Math.max(0,total).toLocaleString();
@@ -2701,6 +2711,8 @@ function updateBooking(id) {
   const totalAmount = feeService + feeParts + feeTranspo + feeOther - feeDiscount;
   const amount      = Math.max(0, totalAmount);
 
+  const oncallFee = parseFloat(document.getElementById('det_oncallFee')?.value)||0;
+  const oncallHelper = document.getElementById('detOncall')?.value?.trim()||'';
   const usage = document.getElementById('detUsage')?.value||'';
   const nextClean = document.getElementById('detNextClean')?.value||'';
   const referred = document.getElementById('detReferred')?.value||'';
@@ -2727,6 +2739,8 @@ function updateBooking(id) {
   b.feeParts    = feeParts    || undefined;
   b.feeTranspo  = feeTranspo  || undefined;
   b.feeOther    = feeOther    || undefined;
+  b.feeOncall   = oncallFee   || undefined;
+  b.oncallHelper= oncallHelper|| undefined;
   b.feeDiscount = feeDiscount || undefined;
   b.amount      = amount > 0 ? String(amount) : (b.amount||'');
   b._dirty = true;
@@ -2973,6 +2987,14 @@ function openNewBooking(name='',phone='',address='') {
       <div class="field"><label>AC Usage Frequency</label>
         <select id="nb_usage"><option value="">— For follow-up tracking —</option>${USAGE_OPTS.map(u=>`<option>${u.label}</option>`).join('')}</select>
       </div>
+      <div class="field"><label>🔔 On Call Helper(s)</label>
+        <input id="nb_oncall" placeholder="e.g. Kuya Boy, Mang Jun" style="width:100%">
+        <div style="font-size:10px;color:var(--text-dim);margin-top:3px">Type name/s ng on-call helper (di kailangan nasa employee list)</div>
+      </div>
+      <div class="field"><label>🔔 On Call Fee (₱)</label>
+        <input type="number" id="nb_oncallFee" min="0" step="0.01" placeholder="0.00">
+        <div style="font-size:10px;color:var(--text-dim);margin-top:3px">Bayad sa on-call — babawas sa net profit</div>
+      </div>
       ${session.role!=='tech'?'<div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nb_investor" style="width:18px;height:18px"> 💼 Investor-Covered Job</label></div>':''}
       <div class="field form-full"><label>Additional Notes</label><textarea id="nb_notes" placeholder="Other instructions, special requests..."></textarea></div>
     </div>`;
@@ -3045,6 +3067,8 @@ async function saveBooking() {
     amount: document.getElementById('nb_amount')?.value||'',
     notes: document.getElementById('nb_notes')?.value||'',
     usage, nextCleaningDate: earliestNext || calcNextCleaning(date, usage),
+    oncallHelper: document.getElementById('nb_oncall')?.value?.trim()||'',
+    feeOncall: parseFloat(document.getElementById('nb_oncallFee')?.value)||undefined,
     status:'Pending', createdAt: new Date().toISOString(), source:'manual',
     investorCovered: !!(document.getElementById('nb_investor')&&document.getElementById('nb_investor').checked)
   };
@@ -3260,7 +3284,7 @@ function renderJobsDailyView(){
       html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+bid+'\')">';
       html += '<div style="flex:1;min-width:0">';
       html += '<div style="font-weight:600;font-size:13px">'+escH(b.name||'—')+'</div>';
-      html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+' · 📍 '+escH(b.address||'—')+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+' · 📍 '+escH(b.address||'—')+(b.oncallHelper?' · 🔔 '+escH(b.oncallHelper):'')+'</div>';
       html += '</div>';
       html += '<div style="text-align:right;white-space:nowrap">';
       if(b.amount) html += '<div style="font-weight:700;color:var(--accent);font-size:13px">₱'+parseFloat(b.amount).toLocaleString()+'</div>';
