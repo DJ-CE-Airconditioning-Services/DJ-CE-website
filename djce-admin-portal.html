@@ -1494,25 +1494,117 @@ function getSelectedPerms() {
   return perms;
 }
 
-// Service Catalog — base prices, descriptions, categories
+// Service Catalog — price matrix per service (Option A: exact price per combination)
+// Each service has priceMatrix: array of {actype, hp, inverter, price}
+// Services without matrix (Electrical, Plumbing, etc.) use basePrice:0 (on-site pricing)
 const DEFAULT_SERVICE_CATALOG = {
-  'Aircon Cleaning – Window Type': {name:'Aircon Cleaning – Window Type', category:'Aircon', basePrice:400, description:'Standard cleaning of window-type aircon units including filter wash, coil cleaning, and drain check.'},
-  'Aircon Cleaning – Split Type': {name:'Aircon Cleaning – Split Type', category:'Aircon', basePrice:500, description:'Deep cleaning of split-type aircon units including indoor/outdoor unit wash, filter, and coil cleaning.'},
-  'Aircon Cleaning – Mounted/Cassette': {name:'Aircon Cleaning – Mounted/Cassette', category:'Aircon', basePrice:800, description:'Cleaning of ceiling-mounted/cassette-type aircon units. Requires ladder and special tools.'},
-  'AWM Deep Cleaning': {name:'AWM Deep Cleaning', category:'Appliance', basePrice:600, description:'Full deep cleaning of automatic washing machine — drum, filter, gasket, and detergent tray.'},
-  'Aircon Installation': {name:'Aircon Installation', category:'Aircon', basePrice:2500, description:'Complete aircon installation including bracket, piping, wiring, and testing.'},
-  'Aircon Relocation': {name:'Aircon Relocation', category:'Aircon', basePrice:2000, description:'Dismantling, transfer, and re-installation of aircon unit to a new location.'},
-  'Aircon Dismantle': {name:'Aircon Dismantle', category:'Aircon', basePrice:800, description:'Safe removal and dismantling of aircon unit. Does not include re-installation.'},
-  'Freon Charging': {name:'Freon Charging', category:'Aircon', basePrice:1500, description:'Refrigerant recharging for aircon units. R22/R32/R410A assessed on-site.'},
-  'Breaker Installation': {name:'Breaker Installation', category:'Electrical', basePrice:500, description:'Installation of circuit breaker for added electrical safety.'},
-  'Aircon Bracket': {name:'Aircon Bracket', category:'Aircon', basePrice:800, description:'Fabrication and installation of outdoor unit bracket.'},
-  'Electrical Work': {name:'Electrical Work', category:'Electrical', basePrice:0, description:'General electrical troubleshooting, wiring, and repair. Price depends on scope.'},
-  'Breaker Installation': {name:'Breaker Installation', category:'Electrical', basePrice:500, description:'Installation of circuit breaker for added electrical safety.'},
-  'Troubleshoot': {name:'Troubleshoot', category:'Other', basePrice:0, description:'Diagnostic troubleshooting for aircon, electrical, or appliance issues. Price depends on findings.'},
-  'Plumbing': {name:'Plumbing', category:'Plumbing', basePrice:0, description:'General plumbing repair, pipe fixing, and leak troubleshooting. Price depends on scope.'},
-  'Others': {name:'Others', category:'Other', basePrice:0, description:'Custom or unlisted services. Describe the service needed.'}
+  'Aircon Cleaning': {name:'Aircon Cleaning', category:'Aircon', basePrice:0, description:'Cleaning of aircon units including filter wash, coil cleaning, and drain check.', priceMatrix:[
+    {actype:'Window Type',hp:'0.75 HP',inverter:'No',price:350},
+    {actype:'Window Type',hp:'1.0 HP',inverter:'No',price:400},
+    {actype:'Window Type',hp:'1.5 HP',inverter:'No',price:450},
+    {actype:'Window Type',hp:'2.0 HP',inverter:'No',price:500},
+    {actype:'Split Type',hp:'1.0 HP',inverter:'No',price:500},
+    {actype:'Split Type',hp:'1.0 HP',inverter:'Yes',price:600},
+    {actype:'Split Type',hp:'1.5 HP',inverter:'No',price:550},
+    {actype:'Split Type',hp:'1.5 HP',inverter:'Yes',price:650},
+    {actype:'Split Type',hp:'2.0 HP',inverter:'No',price:600},
+    {actype:'Split Type',hp:'2.0 HP',inverter:'Yes',price:750},
+    {actype:'Split Type',hp:'2.5 HP',inverter:'Yes',price:850},
+    {actype:'Split Type',hp:'3.0 HP',inverter:'Yes',price:950},
+    {actype:'Cassette/Mounted',hp:'2.0 HP',inverter:'No',price:800},
+    {actype:'Cassette/Mounted',hp:'2.5 HP',inverter:'Yes',price:1000},
+    {actype:'Cassette/Mounted',hp:'3.0 HP',inverter:'Yes',price:1200}
+  ]},
+  'Aircon Installation': {name:'Aircon Installation', category:'Aircon', basePrice:0, description:'Complete aircon installation including bracket, piping, wiring, and testing.', priceMatrix:[
+    {actype:'Window Type',hp:'0.75 HP',inverter:'No',price:1500},
+    {actype:'Window Type',hp:'1.0 HP',inverter:'No',price:1500},
+    {actype:'Split Type',hp:'1.0 HP',inverter:'No',price:2500},
+    {actype:'Split Type',hp:'1.0 HP',inverter:'Yes',price:3000},
+    {actype:'Split Type',hp:'1.5 HP',inverter:'Yes',price:3500},
+    {actype:'Split Type',hp:'2.0 HP',inverter:'Yes',price:4000}
+  ]},
+  'Aircon Relocation': {name:'Aircon Relocation', category:'Aircon', basePrice:0, description:'Dismantling, transfer, and re-installation of aircon unit to a new location.', priceMatrix:[
+    {actype:'Window Type',hp:'',inverter:'',price:1500},
+    {actype:'Split Type',hp:'',inverter:'No',price:2000},
+    {actype:'Split Type',hp:'',inverter:'Yes',price:2500}
+  ]},
+  'Aircon Dismantle': {name:'Aircon Dismantle', category:'Aircon', basePrice:0, description:'Safe removal and dismantling of aircon unit. Does not include re-installation.', priceMatrix:[
+    {actype:'Window Type',hp:'',inverter:'',price:500},
+    {actype:'Split Type',hp:'',inverter:'No',price:800},
+    {actype:'Split Type',hp:'',inverter:'Yes',price:1000}
+  ]},
+  'Freon Charging': {name:'Freon Charging', category:'Aircon', basePrice:0, description:'Refrigerant recharging for aircon units. R22/R32/R410A assessed on-site.', priceMatrix:[
+    {actype:'Window Type',hp:'',inverter:'',price:1200},
+    {actype:'Split Type',hp:'',inverter:'No',price:1500},
+    {actype:'Split Type',hp:'',inverter:'Yes',price:1800}
+  ]},
+  'Aircon Bracket': {name:'Aircon Bracket', category:'Aircon', basePrice:800, description:'Fabrication and installation of outdoor unit bracket.', priceMatrix:[]},
+  'AWM Deep Cleaning': {name:'AWM Deep Cleaning', category:'Appliance', basePrice:600, description:'Full deep cleaning of automatic washing machine — drum, filter, gasket, and detergent tray.', priceMatrix:[]},
+  'Breaker Installation': {name:'Breaker Installation', category:'Electrical', basePrice:500, description:'Installation of circuit breaker for added electrical safety.', priceMatrix:[]},
+  'Electrical Work': {name:'Electrical Work', category:'Electrical', basePrice:0, description:'General electrical troubleshooting, wiring, and repair. Price depends on scope.', priceMatrix:[]},
+  'Troubleshoot': {name:'Troubleshoot', category:'Other', basePrice:0, description:'Diagnostic troubleshooting for aircon, electrical, or appliance issues. Price depends on findings.', priceMatrix:[]},
+  'Plumbing': {name:'Plumbing', category:'Plumbing', basePrice:0, description:'General plumbing repair, pipe fixing, and leak troubleshooting. Price depends on scope.', priceMatrix:[]},
+  'Others': {name:'Others', category:'Other', basePrice:0, description:'Custom or unlisted services. Describe the service needed.', priceMatrix:[]}
 };
 let SERVICE_CATALOG = {};
+
+// Transportation Fees — per area/city
+var DEFAULT_TRANSPO_FEES = {
+  'Calumpit': {fee:0, label:'Free'},
+  'Hagonoy': {fee:100, label:'₱100'},
+  'Apalit': {fee:150, label:'₱150'},
+  'Pulilan': {fee:100, label:'₱100'},
+  'Malolos': {fee:200, label:'₱200'},
+  'Guiguinto': {fee:200, label:'₱200'},
+  'Balagtas': {fee:200, label:'₱200'},
+  'Plaridel': {fee:250, label:'₱250'},
+  'Bocaue': {fee:250, label:'₱250'},
+  'Meycauayan': {fee:300, label:'₱300'},
+  'San Fernando': {fee:350, label:'₱350'},
+  'Angeles': {fee:400, label:'₱400'}
+};
+var TRANSPO_FEES = {};
+try { TRANSPO_FEES = JSON.parse(localStorage.getItem('djce_transpo_fees')||'{}'); } catch(e){ TRANSPO_FEES={}; }
+if(!Object.keys(TRANSPO_FEES).length) TRANSPO_FEES = JSON.parse(JSON.stringify(DEFAULT_TRANSPO_FEES));
+function saveTranspoFees(){ try{localStorage.setItem('djce_transpo_fees',JSON.stringify(TRANSPO_FEES));}catch(e){} }
+
+// Lookup price from service catalog matrix
+function lookupServicePrice(serviceName, actype, hp, inverter){
+  var svc = SERVICE_CATALOG[serviceName];
+  if(!svc) return 0;
+  if(!svc.priceMatrix || !svc.priceMatrix.length) return svc.basePrice||0;
+  // Try exact match first
+  var match = svc.priceMatrix.find(function(m){
+    var typeMatch = !m.actype || !actype || m.actype===actype;
+    var hpMatch = !m.hp || !hp || m.hp===hp;
+    var invMatch = !m.inverter || !inverter || m.inverter===inverter;
+    return typeMatch && hpMatch && invMatch;
+  });
+  // Try with just type + inverter (no HP)
+  if(!match && actype){
+    match = svc.priceMatrix.find(function(m){
+      return m.actype===actype && (!m.inverter || !inverter || m.inverter===inverter) && !m.hp;
+    });
+  }
+  // Try with just type
+  if(!match && actype){
+    match = svc.priceMatrix.find(function(m){ return m.actype===actype && !m.hp && !m.inverter; });
+  }
+  return match ? match.price : (svc.basePrice||0);
+}
+
+// Lookup transpo fee by area/city
+function lookupTranspoFee(address){
+  if(!address) return {fee:0, area:'', caseToCase:false};
+  var addr = address.toLowerCase();
+  var areas = Object.keys(TRANSPO_FEES);
+  for(var i=0;i<areas.length;i++){
+    if(addr.indexOf(areas[i].toLowerCase())!==-1){
+      return {fee:TRANSPO_FEES[areas[i]].fee||0, area:areas[i], caseToCase:false};
+    }
+  }
+  return {fee:0, area:'', caseToCase:true}; // No match = case to case
+}
 let BOOKING_PHOTOS = {};
 let SCHEDULE_SLOTS = []; // { slotId, date, timeSlot, label, time, maxBookings, currentBookings, remaining, status }
 let WAITLIST = []; // { id, name, phone, email, address, barangay, city, service, preferredDate, preferredTime, notes, status, source, createdAt }
@@ -2608,6 +2700,8 @@ function openBookingDetail(id) {
         <div class="field">
           <label>Transport Fee (₱) <span style="font-size:10px;color:var(--text-dim)">transpo / gas</span></label>
           <input type="number" id="det_transpo" value="${b.feeTranspo||''}" min="0" step="0.01" placeholder="0.00" oninput="calcPaymentTotal()">
+          ${b.transpoArea?'<div style="font-size:10px;color:var(--success);margin-top:2px">📍 '+b.transpoArea+(b.feeTranspo?' — ₱'+parseFloat(b.feeTranspo).toLocaleString():' — Free')+'</div>':''}
+          ${b.transpoCaseToCase?'<div style="font-size:10px;color:#f59e0b;margin-top:2px">⚠️ Case to Case — area not in list</div>':''}
         </div>
         <div class="field">
           <label>Other Charges (₱) <span style="font-size:10px;color:var(--text-dim)">misc, add-ons</span></label>
@@ -2759,10 +2853,17 @@ function updateBooking(id) {
   if (notes !== undefined) b.notes = notes;
   if (usage) { b.usage = usage; if (!nextClean && b.date) b.nextCleaningDate = calcNextCleaning(b.date, usage); }
   if (nextClean) b.nextCleaningDate = nextClean;
+  // Auto-compute transpo from address if not manually set
+  if(!feeTranspo && b.address){
+    var transpoResult = lookupTranspoFee(b.address);
+    if(transpoResult.fee) b.feeTranspo = transpoResult.fee;
+    b.transpoArea = transpoResult.area || b.transpoArea || '';
+    b.transpoCaseToCase = transpoResult.caseToCase || false;
+  }
   // Save breakdown
   b.feeService  = feeService  || undefined;
   b.feeParts    = feeParts    || undefined;
-  b.feeTranspo  = feeTranspo  || undefined;
+  b.feeTranspo  = feeTranspo  || b.feeTranspo || undefined;
   b.feeOther    = feeOther    || undefined;
   b.oncallType  = oncallType   || undefined;
   b.oncallHelper= oncallHelper || undefined;
@@ -2898,24 +2999,32 @@ function buildSvcDetailFields(idx, svc){
   var bac='<select id="'+p+'brand"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>';
   var fl='<select id="'+p+'floor"><option value="">— Floor —</option>'+FLOOR_OPTS.map(function(f){return '<option>'+f+'</option>';}).join('')+'</select>';
 
+  var inv='<select id="'+p+'inverter" onchange="autoFillPrice('+idx+')"><option value="">—</option><option value="Yes">Yes (Inverter)</option><option value="No">No (Non-Inverter)</option></select>';
+  var actypeWithAuto='<select id="'+p+'actype" onchange="autoFillPrice('+idx+')"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
+  var hpWithAuto='<select id="'+p+'hp" onchange="autoFillPrice('+idx+')"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
+
   if(svc==='Aircon Cleaning'){
     return '<div class="form-grid" style="margin-top:6px">'+
-      '<div class="field"><label>Type *</label><select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option></select></div>'+
-      '<div class="field"><label>HP *</label>'+hp+'</div>'+
+      '<div class="field"><label>Type *</label>'+actypeWithAuto+'</div>'+
+      '<div class="field"><label>HP *</label>'+hpWithAuto+'</div>'+
+      '<div class="field"><label>Inverter</label>'+inv+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
+      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
       '<div class="field"><label>Next Cleaning</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
       '<div class="field"><label>&nbsp;</label><span id="'+p+'nextlbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:none"></span></div>'+
     '</div>';
   }
   if(svc==='Aircon Installation'){
     return '<div class="form-grid" style="margin-top:6px">'+
-      '<div class="field"><label>Type *</label><select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option></select></div>'+
-      '<div class="field"><label>HP *</label>'+hp+'</div>'+
+      '<div class="field"><label>Type *</label>'+actypeWithAuto+'</div>'+
+      '<div class="field"><label>HP *</label>'+hpWithAuto+'</div>'+
+      '<div class="field"><label>Inverter</label>'+inv+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
+      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc.includes('AWM Deep Clean')){
@@ -2931,20 +3040,24 @@ function buildSvcDetailFields(idx, svc){
   }
   if(svc==='Aircon Relocation'||svc==='Aircon Dismantle'){
     return '<div class="form-grid" style="margin-top:6px">'+
-      '<div class="field"><label>Type</label><select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option></select></div>'+
-      '<div class="field"><label>HP</label>'+hp+'</div>'+
+      '<div class="field"><label>Type</label>'+actypeWithAuto+'</div>'+
+      '<div class="field"><label>HP</label>'+hpWithAuto+'</div>'+
+      '<div class="field"><label>Inverter</label>'+inv+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
+      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc==='Freon Charging'){
     return '<div class="form-grid" style="margin-top:6px">'+
-      '<div class="field"><label>Type</label><select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option></select></div>'+
-      '<div class="field"><label>HP</label>'+hp+'</div>'+
+      '<div class="field"><label>Type</label>'+actypeWithAuto+'</div>'+
+      '<div class="field"><label>HP</label>'+hpWithAuto+'</div>'+
+      '<div class="field"><label>Inverter</label>'+inv+'</div>'+
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Refrigerant</label><select id="'+p+'refrig"><option value="">—</option><option>R22</option><option>R32</option><option>R410A</option></select></div>'+
       amtField+
+      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc==='Aircon Bracket'){
@@ -2977,11 +3090,12 @@ function getServiceDetails() {
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
     var item={service:svc, brand:pick('brand'), hp:pick('hp'), actype:pick('actype'),
-      floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount')};
+      inverter:pick('inverter'), floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount')};
     entries.push(item);
     var pts=[svc];
     if(item.actype)pts.push(item.actype);
     if(item.hp)pts.push(item.hp);
+    if(item.inverter==='Yes')pts.push('Inverter');
     if(item.brand)pts.push(item.brand);
     if(item.wmcap)pts.push(item.wmcap);
     if(item.floor)pts.push(item.floor);
@@ -2990,6 +3104,40 @@ function getServiceDetails() {
     summaryParts.push(pts.join(' · '));
   });
   return {fields:{serviceEntries:entries}, summary:summaryParts.join(' | ')};
+}
+
+// Auto-fill price from catalog matrix when type/HP/inverter changes
+function autoFillPrice(idx){
+  var p='svc_'+idx+'_';
+  var svc=document.getElementById('svc_type_'+idx)?.value||'';
+  var actype=document.getElementById(p+'actype')?.value||'';
+  var hp=document.getElementById(p+'hp')?.value||'';
+  var inverter=document.getElementById(p+'inverter')?.value||'';
+  var amtEl=document.getElementById(p+'amount');
+  var hintEl=document.getElementById(p+'priceHint');
+  if(!svc||!actype) return;
+  var price=lookupServicePrice(svc,actype,hp,inverter);
+  if(price>0 && amtEl){
+    amtEl.value=price;
+    if(hintEl) hintEl.style.display='block';
+  }
+}
+
+// Auto-fill transpo fee based on address when creating booking
+function autoFillTranspoFromAddress(){
+  var addr=document.getElementById('nb_address')?.value||'';
+  if(!addr) return;
+  var result=lookupTranspoFee(addr);
+  var transpoDisplay=document.getElementById('nb_transpoDisplay');
+  if(transpoDisplay){
+    if(result.area && !result.caseToCase){
+      transpoDisplay.innerHTML='<span style="font-size:12px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">🚐 '+result.area+': '+(result.fee?'₱'+result.fee:'FREE')+'</span>';
+    } else if(result.caseToCase){
+      transpoDisplay.innerHTML='<span style="font-size:12px;padding:4px 10px;background:rgba(239,68,68,.1);color:var(--danger);border-radius:6px;font-weight:600">🚐 Case to Case — set transpo fee manually</span>';
+    } else {
+      transpoDisplay.innerHTML='';
+    }
+  }
 }
 
 function checkBlacklistWarning() {
@@ -3026,7 +3174,8 @@ function openNewBooking(name='',phone='',address='') {
       <div class="field form-full"><label>Client Name *</label><input id="nb_name" value="${name}" placeholder="e.g. Juan Dela Cruz" oninput="checkBlacklistWarning()"></div>
       <div class="field"><label>Phone *</label><input id="nb_phone" value="${phone}" placeholder="09171234567" type="tel" oninput="checkBlacklistWarning()"></div>
       <div class="field"><label>Email</label><input id="nb_email" placeholder="email@example.com" type="email"></div>
-      <div class="field form-full"><label>Address *</label><input id="nb_address" value="${address}" placeholder="House/Street/Barangay/City"></div>
+      <div class="field form-full"><label>Address *</label><input id="nb_address" value="${address}" placeholder="House/Street/Barangay/City" oninput="autoFillTranspoFromAddress()"></div>
+      <div class="field form-full" id="nb_transpoDisplay"></div>
       <div class="field"><label>Landmark</label><input id="nb_landmark" placeholder="e.g. Near Jollibee"></div>
       <div class="field"><label>👤 Contact Person @ Site</label><input id="nb_contact" placeholder="Sino aabutan sa bahay?"></div>
       <div class="field"><label>📱 Contact Person Phone</label><input id="nb_contactPhone" type="tel" placeholder="Phone ng aabutan"></div>
@@ -3129,6 +3278,22 @@ async function saveBooking() {
       if(!earliestNext||e.nextdate<earliestNext) earliestNext=e.nextdate;
     }
   });
+  // Auto-compute service fee from price matrix
+  var totalServiceFee = 0;
+  validSvc.forEach(function(e){
+    var amt = parseFloat(e.amount)||0;
+    if(amt) totalServiceFee += amt;
+    else {
+      var matrixPrice = lookupServicePrice(e.service, e.actype, e.hp, e.inverter);
+      if(matrixPrice) totalServiceFee += matrixPrice;
+    }
+  });
+  // Auto-compute transpo fee from address
+  var transpoResult = lookupTranspoFee(address);
+  var transpoFee = transpoResult.fee || 0;
+  var manualAmount = document.getElementById('nb_amount')?.value||'';
+  var totalAmount = manualAmount || (totalServiceFee + transpoFee) || '';
+
   BOOKINGS[id] = {
     id, refNo, name, phone,
     email: document.getElementById('nb_email')?.value||'',
@@ -3139,7 +3304,11 @@ async function saveBooking() {
     serviceTier: document.getElementById('nb_tier')?.value||'Normal',
     date, time: getSelectedTime(),
     technician: getTechPickerValue('nb_techPicker'),
-    amount: document.getElementById('nb_amount')?.value||'',
+    amount: totalAmount,
+    feeService: totalServiceFee || undefined,
+    feeTranspo: transpoFee || undefined,
+    transpoArea: transpoResult.area || '',
+    transpoCaseToCase: transpoResult.caseToCase || false,
     notes: document.getElementById('nb_notes')?.value||'',
     usage, nextCleaningDate: earliestNext || calcNextCleaning(date, usage),
     oncallType: document.getElementById('nb_oncallType')?.value||'',
@@ -12388,25 +12557,179 @@ function renderServiceCatalog() {
     if (!cats[s.category]) cats[s.category] = [];
     cats[s.category].push(s);
   });
-  var rows = Object.values(SERVICE_CATALOG).map(function(s) {
-    return '<tr>'
-      +'<td><strong>'+s.name+'</strong></td>'
-      +'<td><span class="bc-tag" style="font-size:10px">'+(s.category||'—')+'</span></td>'
-      +'<td style="font-size:12px">'+(s.basePrice?'₱'+parseFloat(s.basePrice).toLocaleString():'<span style="color:var(--text-dim)">On-site</span>')+'</td>'
-      +'<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(s.description||'').replace(/"/g,'&quot;')+'">'+(s.description||'—')+'</td>'
-      +'<td><button class="btn btn-primary btn-xs" onclick="editCatalogService(\''+s.name.replace(/'/g,"\\'")+'\')" title="Edit">✏️</button></td>'
-      +'</tr>';
-  }).join('');
+  var html = '';
+  var catOrder = ['Aircon','Appliance','Electrical','Plumbing','Other'];
+  catOrder.forEach(function(cat){
+    if(!cats[cat]) return;
+    html += '<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);padding:6px 0">'+cat+'</div>';
+    cats[cat].forEach(function(s){
+      var eName = s.name.replace(/'/g,"\\'");
+      var hasMatrix = s.priceMatrix && s.priceMatrix.length > 0;
+      var priceLabel = hasMatrix ? s.priceMatrix.length+' price'+(s.priceMatrix.length>1?'s':'') : (s.basePrice ? '₱'+parseFloat(s.basePrice).toLocaleString() : 'On-site');
+      var priceBg = hasMatrix ? 'background:var(--accent-soft);color:var(--accent)' : (s.basePrice ? 'background:var(--success-soft,rgba(16,185,129,.12));color:var(--success)' : 'color:var(--text-dim)');
+      html += '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">';
+      html += '<div onclick="toggleCatalogAccordion(\'cat_'+eName+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer">';
+      html += '<span style="font-size:14px">'+(cat==='Aircon'?'🧊':cat==='Appliance'?'🫧':cat==='Electrical'?'⚡':cat==='Plumbing'?'🔧':'📋')+'</span>';
+      html += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+s.name+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.description||'')+'</div></div>';
+      html += '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;white-space:nowrap;'+priceBg+'">'+priceLabel+'</span>';
+      html += '<button class="btn btn-primary btn-xs" onclick="event.stopPropagation();editCatalogService(\''+eName+'\')" title="Edit Service">✏️</button>';
+      html += '<span id="cat_'+eName+'_arrow" style="font-size:10px;color:var(--text-dim);transition:transform .2s">▼</span>';
+      html += '</div>';
+      // Expandable matrix
+      html += '<div id="cat_'+eName+'" style="display:none;border-top:1px solid var(--border);padding:10px 14px;background:var(--bg-elev1,var(--bg))">';
+      if(hasMatrix){
+        html += '<div class="tbl-wrap"><table style="font-size:12px"><thead><tr><th>Type</th><th>HP</th><th>Inverter</th><th style="text-align:right">Price</th><th></th></tr></thead><tbody>';
+        s.priceMatrix.forEach(function(m,mi){
+          html += '<tr><td>'+(m.actype||'—')+'</td><td>'+(m.hp||'Any')+'</td>';
+          html += '<td>'+(m.inverter==='Yes'?'<span style="color:var(--info);font-weight:600">✓ Inverter</span>':m.inverter==='No'?'Non-Inv':'—')+'</td>';
+          html += '<td style="text-align:right;font-weight:700;color:var(--accent)">₱'+parseFloat(m.price).toLocaleString()+'</td>';
+          html += '<td><button class="btn btn-danger btn-xs" onclick="removePriceEntry(\''+eName+'\','+mi+')" title="Remove">✕</button></td></tr>';
+        });
+        html += '</tbody></table></div>';
+      } else if(s.basePrice){
+        html += '<div style="font-size:12px;color:var(--text-dim)">Fixed price: <strong style="color:var(--accent)">₱'+parseFloat(s.basePrice).toLocaleString()+'</strong> — no matrix needed</div>';
+      } else {
+        html += '<div style="font-size:12px;color:var(--text-dim)">On-site pricing — no fixed rate</div>';
+      }
+      html += '<div style="margin-top:8px"><button class="btn btn-outline btn-xs" onclick="addPriceEntry(\''+eName+'\')">➕ Add Price</button></div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  });
   return '<div class="panel">'
-    +'<div class="panel-head"><div class="panel-title">📋 Service Catalog</div></div>'
+    +'<div class="panel-head"><div class="panel-title">📋 Service Catalog — Price Matrix</div></div>'
     +'<div class="panel-body">'
-    +'<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px">Manage base prices, descriptions, and categories for each service. These are used as reference when creating bookings.</div>'
-    +'<div class="tbl-wrap"><table>'
-    +'<thead><tr><th>Service</th><th>Category</th><th>Base Price</th><th>Description</th><th></th></tr></thead>'
-    +'<tbody>'+rows+'</tbody>'
-    +'</table></div>'
+    +'<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px">Set exact prices per service × type × HP × inverter. Click a service to view/manage its price matrix. Auto-computed pag may booking.</div>'
+    +html
     +'<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="addNewCatalogService()">➕ Add New Service</button></div>'
+    +'</div></div>'
+    +renderTranspoFeeSettings();
+}
+
+function toggleCatalogAccordion(id){
+  var el=document.getElementById(id);
+  var arrow=document.getElementById(id+'_arrow');
+  if(!el) return;
+  if(el.style.display==='none'){el.style.display='block';if(arrow)arrow.style.transform='rotate(180deg)';}
+  else{el.style.display='none';if(arrow)arrow.style.transform='';}
+}
+
+function addPriceEntry(svcName){
+  var svc=SERVICE_CATALOG[svcName];
+  if(!svc) return;
+  document.getElementById('emTitle').textContent='Add Price Entry';
+  document.getElementById('emSub').textContent=svcName;
+  var actypes=['Window Type','Split Type','Cassette/Mounted'];
+  document.getElementById('emBody').innerHTML='<div class="form-grid">'
+    +'<div class="field"><label>AC Type</label><select id="pe_actype"><option value="">— Any —</option>'+actypes.map(function(t){return '<option>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="field"><label>HP</label><select id="pe_hp"><option value="">— Any —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select></div>'
+    +'<div class="field"><label>Inverter</label><select id="pe_inverter"><option value="">— Any —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>'
+    +'<div class="field"><label>Price (₱) *</label><input type="number" id="pe_price" min="0" step="0.01" placeholder="0.00"></div>'
+    +'</div>';
+  document.getElementById('emFoot').innerHTML=
+    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
+    +'<button class="btn btn-gold btn-sm" onclick="savePriceEntry(\''+svcName.replace(/'/g,"\\'")+'\')">💾 Add</button>';
+  openModal('editModal');
+}
+
+function savePriceEntry(svcName){
+  var price=parseFloat(document.getElementById('pe_price').value);
+  if(!price||price<=0){showToast('Enter a valid price','error');return;}
+  var svc=SERVICE_CATALOG[svcName];
+  if(!svc) return;
+  if(!svc.priceMatrix) svc.priceMatrix=[];
+  svc.priceMatrix.push({
+    actype:document.getElementById('pe_actype').value,
+    hp:document.getElementById('pe_hp').value,
+    inverter:document.getElementById('pe_inverter').value,
+    price:price
+  });
+  saveLocalData();
+  closeModal('editModal');
+  switchView('settings');
+  showToast('Price entry added!','success');
+}
+
+function removePriceEntry(svcName,idx){
+  confirm2('Remove this price entry?',function(){
+    var svc=SERVICE_CATALOG[svcName];
+    if(!svc||!svc.priceMatrix) return;
+    svc.priceMatrix.splice(idx,1);
+    saveLocalData();
+    switchView('settings');
+    showToast('Price entry removed','success');
+  });
+}
+
+// Transportation Fee settings panel
+function renderTranspoFeeSettings(){
+  var rows='';
+  var areas=Object.keys(TRANSPO_FEES).sort();
+  areas.forEach(function(area){
+    var t=TRANSPO_FEES[area];
+    rows+='<tr><td style="font-weight:600">📍 '+area+'</td>'
+      +'<td style="text-align:right;font-weight:700;'+(t.fee?'color:var(--accent)':'color:var(--success)')+'">'+(!t.fee?'FREE':'₱'+parseFloat(t.fee).toLocaleString())+'</td>'
+      +'<td><button class="btn btn-primary btn-xs" onclick="editTranspoArea(\''+area.replace(/'/g,"\\'")+'\')" title="Edit">✏️</button> '
+      +'<button class="btn btn-danger btn-xs" onclick="removeTranspoArea(\''+area.replace(/'/g,"\\'")+'\')" title="Remove">✕</button></td></tr>';
+  });
+  return '<div class="panel" style="margin-top:16px">'
+    +'<div class="panel-head"><div class="panel-title">🚐 Transportation Fees — Per Area</div></div>'
+    +'<div class="panel-body">'
+    +'<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px">Fixed transpo fee per city/municipality. Auto-applied sa booking based on address. Pag wala sa list, "Case to Case" — may reason field para sa audit trail.</div>'
+    +'<div class="tbl-wrap"><table style="font-size:12.5px"><thead><tr><th>Area / City</th><th style="text-align:right">Fee</th><th></th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>'
+    +'<div style="margin-top:10px;padding:10px 12px;background:var(--accent-soft);border-radius:8px;font-size:12px;color:var(--accent);font-weight:600">ℹ️ Addresses not matching any area above = <strong>"Case to Case"</strong> — admin inputs custom amount + reason (saved for auditing)</div>'
+    +'<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="addTranspoArea()">➕ Add Area</button></div>'
     +'</div></div>';
+}
+
+function addTranspoArea(){
+  document.getElementById('emTitle').textContent='Add Transportation Area';
+  document.getElementById('emSub').textContent='Set fixed fee per area';
+  document.getElementById('emBody').innerHTML='<div class="form-grid">'
+    +'<div class="field"><label>Area / City *</label><input id="ta_name" placeholder="e.g. Meycauayan"></div>'
+    +'<div class="field"><label>Fee (₱)</label><input type="number" id="ta_fee" min="0" step="1" placeholder="0 = Free"></div>'
+    +'</div>';
+  document.getElementById('emFoot').innerHTML=
+    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
+    +'<button class="btn btn-gold btn-sm" onclick="saveTranspoArea()">💾 Add</button>';
+  openModal('editModal');
+}
+
+function editTranspoArea(area){
+  var t=TRANSPO_FEES[area]||{fee:0};
+  document.getElementById('emTitle').textContent='Edit Transportation Fee';
+  document.getElementById('emSub').textContent=area;
+  document.getElementById('emBody').innerHTML='<div class="form-grid">'
+    +'<div class="field"><label>Area / City</label><input id="ta_name" value="'+area+'" readonly style="background:var(--bg-elev2)"></div>'
+    +'<div class="field"><label>Fee (₱)</label><input type="number" id="ta_fee" min="0" step="1" value="'+(t.fee||0)+'" placeholder="0 = Free"></div>'
+    +'</div>';
+  document.getElementById('emFoot').innerHTML=
+    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
+    +'<button class="btn btn-gold btn-sm" onclick="saveTranspoArea(\''+area.replace(/'/g,"\\'")+'\')">💾 Save</button>';
+  openModal('editModal');
+}
+
+function saveTranspoArea(oldName){
+  var name=document.getElementById('ta_name').value.trim();
+  if(!name){showToast('Enter area name','error');return;}
+  var fee=parseFloat(document.getElementById('ta_fee').value)||0;
+  if(oldName && oldName!==name) delete TRANSPO_FEES[oldName];
+  TRANSPO_FEES[name]={fee:fee, label:fee?'₱'+fee:'Free'};
+  saveTranspoFees();
+  closeModal('editModal');
+  switchView('settings');
+  showToast('Transportation fee saved!','success');
+}
+
+function removeTranspoArea(area){
+  confirm2('Remove '+area+' from transpo fee list?',function(){
+    delete TRANSPO_FEES[area];
+    saveTranspoFees();
+    switchView('settings');
+    showToast('Area removed','success');
+  });
 }
 
 function addNewCatalogService() {
@@ -12417,7 +12740,7 @@ function addNewCatalogService() {
     +'<div class="field"><label>Category</label><select id="cs_cat">'
     +'<option value="Aircon">Aircon</option><option value="Appliance">Appliance</option><option value="Electrical">Electrical</option><option value="Plumbing">Plumbing</option><option value="Other">Other</option>'
     +'</select></div>'
-    +'<div class="field"><label>Base Price (₱)</label><input type="number" id="cs_price" value="" min="0" step="0.01" placeholder="0.00"></div>'
+    +'<div class="field"><label>Base Price (₱) <span style="font-size:10px;color:var(--text-dim)">for services without matrix</span></label><input type="number" id="cs_price" value="" min="0" step="0.01" placeholder="0 = On-site pricing"></div>'
     +'<div class="field form-full"><label>Description</label><textarea id="cs_desc" placeholder="Describe what this service includes..." style="min-height:60px"></textarea></div>'
     +'<div class="field form-full"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cs_addToDropdown" checked style="width:18px;height:18px"> Also add to booking dropdown</label></div>'
     +'</div>';
@@ -12428,7 +12751,7 @@ function addNewCatalogService() {
 }
 
 function editCatalogService(name) {
-  var s = SERVICE_CATALOG[name] || {name:name, category:'', basePrice:0, description:''};
+  var s = SERVICE_CATALOG[name] || {name:name, category:'', basePrice:0, description:'', priceMatrix:[]};
   document.getElementById('emTitle').textContent = 'Edit Service';
   document.getElementById('emSub').textContent = name;
   document.getElementById('emBody').innerHTML = '<div class="form-grid">'
@@ -12440,7 +12763,7 @@ function editCatalogService(name) {
     +'<option value="Plumbing"'+(s.category==='Plumbing'?' selected':'')+'>Plumbing</option>'
     +'<option value="Other"'+(s.category==='Other'?' selected':'')+'>Other</option>'
     +'</select></div>'
-    +'<div class="field"><label>Base Price (₱)</label><input type="number" id="cs_price" value="'+(s.basePrice||'')+'" min="0" step="0.01" placeholder="0.00"></div>'
+    +'<div class="field"><label>Base Price (₱) <span style="font-size:10px;color:var(--text-dim)">fallback if no matrix match</span></label><input type="number" id="cs_price" value="'+(s.basePrice||'')+'" min="0" step="0.01" placeholder="0 = On-site pricing"></div>'
     +'<div class="field form-full"><label>Description</label><textarea id="cs_desc" placeholder="Describe what this service includes..." style="min-height:60px">'+(s.description||'')+'</textarea></div>'
     +'</div>';
   document.getElementById('emFoot').innerHTML =
@@ -12452,11 +12775,13 @@ function editCatalogService(name) {
 function saveCatalogService(isNew) {
   var name = document.getElementById('cs_name').value.trim();
   if(!name){ showToast('Service name is required','error'); document.getElementById('cs_name').style.border='2px solid #dc2626'; return; }
+  var existing = SERVICE_CATALOG[name] || {};
   SERVICE_CATALOG[name] = {
     name: name,
     category: document.getElementById('cs_cat').value,
     basePrice: parseFloat(document.getElementById('cs_price').value)||0,
-    description: document.getElementById('cs_desc').value.trim()
+    description: document.getElementById('cs_desc').value.trim(),
+    priceMatrix: existing.priceMatrix || []
   };
   // Add to SERVICES dropdown if checkbox is checked (new service)
   if(isNew){
