@@ -1919,7 +1919,9 @@ function renderDashboard() {
   if (unassigned.length) alerts.push({type:'warning', msg:`${unassigned.length} booking${unassigned.length!==1?'s':''} unassigned — needs technician`, action:"switchView('jobs')"});
   if (backjob.length)    alerts.push({type:'danger',  msg:`${backjob.length} job${backjob.length!==1?'s':''} for backjob — follow up needed`, action:"switchJobTab('backjob');switchView('jobs')"});
   const overdueClients = Object.values(CLIENTS).filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now);
-  if (overdueClients.length) alerts.push({type:'info', msg:`${overdueClients.length} client${overdueClients.length!==1?'s':''} overdue for cleaning`, action:"switchView('followup')"});
+  if (overdueClients.length) alerts.push({type:'danger', msg:`${overdueClients.length} client${overdueClients.length!==1?'s':''} overdue for cleaning — tawagan na!`, action:"switchView('clients')"});
+  const dueClients = getDueClients().filter(c=>{var d=(new Date(c.nextCleaningDate)-now)/(1000*60*60*24);return d>=0;});
+  if (dueClients.length) alerts.push({type:'warning', msg:`${dueClients.length} client${dueClients.length!==1?'s':''} due for service within ${SERVICE_SETTINGS.warningDays} days`, action:"switchView('clients')"});
   const openComplaints = COMPLAINTS.filter(c=>c.status==='Open');
   if (openComplaints.length) alerts.push({type:'danger', msg:`${openComplaints.length} open complaint${openComplaints.length!==1?'s':''}`, action:"switchView('complaints')"});
   var blActive = BLACKLIST.filter(b=>b.status==='active');
@@ -3585,7 +3587,7 @@ function renderClients() {
         <select id="clFilter" onchange="filterClientsView(document.getElementById('clSearch').value)">
           <option value="">All Clients</option>
           <option value="overdue">🔴 Overdue for Cleaning</option>
-          <option value="due">⚠️ Due Soon (≤14 days)</option>
+          <option value="due">🔴 Due Soon (within warning window)</option>
           <option value="ok">✅ On Track</option>
           <option value="blacklisted">🚫 Blacklisted</option>
         </select>
@@ -3605,8 +3607,9 @@ function renderClientRows(clients) {
   return clients.map(function(c) {
     var next = c.nextCleaningDate ? new Date(c.nextCleaningDate) : null;
     var diff = next ? (next - now)/(1000*60*60*24) : 999;
-    var sCls = !next ? 's-confirmed' : diff < 0 ? 's-cancelled' : diff <= 14 ? 's-pending' : 's-done';
-    var sLbl = !next ? 'No date' : diff < 0 ? 'Overdue' : diff <= 14 ? 'Due '+formatDate(c.nextCleaningDate) : 'On track';
+    var warn = SERVICE_SETTINGS.warningDays||14;
+    var sCls = !next ? 's-confirmed' : diff < 0 ? 's-cancelled' : diff <= warn ? 's-cancelled' : 's-done';
+    var sLbl = !next ? 'No date' : diff < 0 ? '🔴 Overdue' : diff <= warn ? '🔴 Due '+formatDate(c.nextCleaningDate) : '🟢 On track';
     var bl = isBlacklisted(c.name, c.phone);
     var eName = escH(c.name||'').replace(/'/g,'&#39;');
     var ePhone = escH(c.phone||'').replace(/'/g,'&#39;');
@@ -3646,8 +3649,8 @@ function filterClientsView(q) {
   if (q) clients = clients.filter(c=>(c.name+c.phone+c.address).toLowerCase().includes(q.toLowerCase()));
   const now = new Date();
   if (filter==='overdue') clients = clients.filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now);
-  else if (filter==='due') clients = clients.filter(c=>{if(!c.nextCleaningDate)return false;const d=new Date(c.nextCleaningDate);const diff=(d-now)/(1000*60*60*24);return diff>=0&&diff<=14;});
-  else if (filter==='ok') clients = clients.filter(c=>{if(!c.nextCleaningDate)return true;return(new Date(c.nextCleaningDate)-now)/(1000*60*60*24)>14;});
+  else if (filter==='due') clients = clients.filter(c=>{if(!c.nextCleaningDate)return false;const d=new Date(c.nextCleaningDate);const diff=(d-now)/(1000*60*60*24);return diff>=0&&diff<=(SERVICE_SETTINGS.warningDays||14);});
+  else if (filter==='ok') clients = clients.filter(c=>{if(!c.nextCleaningDate)return true;return(new Date(c.nextCleaningDate)-now)/(1000*60*60*24)>(SERVICE_SETTINGS.warningDays||14);});
   else if (filter==='blacklisted') clients = clients.filter(c=>isBlacklisted(c.name,c.phone));
   const tb=document.getElementById('clTBody');
   if(tb)tb.innerHTML=renderClientRows(clients);
@@ -8898,6 +8901,38 @@ function rejectCommission(commId) {
   switchView('accounting');
 }
 
+function saveWarningDays() {
+  var d = parseInt(document.getElementById('ss_warnDays').value);
+  if (isNaN(d)||d<1||d>90) { showToast('Enter 1–90 days','error'); return; }
+  SERVICE_SETTINGS.warningDays = d;
+  saveServiceSettings();
+  showToast('Warning window set to '+d+' days','success');
+}
+
+function saveServiceIntervals() {
+  var opts = [];
+  for (var i=0; i<SERVICE_SETTINGS.usageOpts.length; i++) {
+    var lbl = document.getElementById('ss_label_'+i)?.value?.trim();
+    var mo = parseFloat(document.getElementById('ss_months_'+i)?.value);
+    if (!lbl) continue;
+    if (isNaN(mo)||mo<1) { showToast('Invalid months for "'+lbl+'"','error'); return; }
+    opts.push({label:lbl, months:mo});
+  }
+  if (!opts.length) { showToast('At least one interval is required','error'); return; }
+  SERVICE_SETTINGS.usageOpts = opts;
+  saveServiceSettings();
+  showToast('Service intervals saved!','success');
+}
+
+function resetServiceIntervals() {
+  if (!confirm('Reset to default intervals?')) return;
+  SERVICE_SETTINGS.usageOpts = JSON.parse(JSON.stringify(DEFAULT_USAGE_OPTS));
+  SERVICE_SETTINGS.warningDays = 14;
+  saveServiceSettings();
+  showToast('Reset to defaults','success');
+  switchView('settings');
+}
+
 function saveCommissionRates() {
   var n = parseFloat(document.getElementById('cr_new').value);
   var r = parseFloat(document.getElementById('cr_repeat').value);
@@ -10411,7 +10446,7 @@ function scrollToTop() { window.scrollTo({top:0,behavior:'smooth'}); }
 document.addEventListener('DOMContentLoaded', init);
 
 /* ===== USAGE FREQUENCY OPTIONS ===== */
-const USAGE_OPTS=[
+const DEFAULT_USAGE_OPTS=[
   {label:'Daily use (4–5 mos)',months:4.5},
   {label:'Daytime only (5 mos)',months:5},
   {label:'Evenings only (6 mos)',months:6},
@@ -10419,6 +10454,22 @@ const USAGE_OPTS=[
   {label:'Occasional (8 mos)',months:8},
   {label:'Rarely used (12 mos)',months:12}
 ];
+var SERVICE_SETTINGS = {
+  usageOpts: JSON.parse(JSON.stringify(DEFAULT_USAGE_OPTS)),
+  warningDays: 14  // days before due date to turn RED
+};
+try {
+  var _ss = JSON.parse(localStorage.getItem('djce_service_settings'));
+  if (_ss) {
+    if (_ss.usageOpts && _ss.usageOpts.length) SERVICE_SETTINGS.usageOpts = _ss.usageOpts;
+    if (_ss.warningDays !== undefined) SERVICE_SETTINGS.warningDays = parseInt(_ss.warningDays) || 14;
+  }
+} catch(e){}
+var USAGE_OPTS = SERVICE_SETTINGS.usageOpts;
+function saveServiceSettings() {
+  USAGE_OPTS = SERVICE_SETTINGS.usageOpts;
+  try { localStorage.setItem('djce_service_settings', JSON.stringify(SERVICE_SETTINGS)); } catch(e){}
+}
 
 let CLIENTS={};
 
@@ -10474,10 +10525,11 @@ function mergeClients(){
 /* ===== DUE / FOLLOW-UP ===== */
 function getDueClients(){
   const today=new Date();
+  const warn=SERVICE_SETTINGS.warningDays||14;
   return mergeClients().filter(c=>{
     if(!c.nextCleaningDate)return false;
     const diff=(new Date(c.nextCleaningDate)-today)/(1000*60*60*24);
-    return diff<=14;
+    return diff<=warn;
   }).sort((a,b)=>new Date(a.nextCleaningDate)-new Date(b.nextCleaningDate));
 }
 
@@ -10640,9 +10692,10 @@ function openNewClient(){
   document.getElementById('emTitle').textContent='Add Client Record';
   document.getElementById('emSub').textContent='Manual entry — old or existing clients';
   document.getElementById('emBody').innerHTML=
+    '<div id="nc_dupeAlert" style="display:none;background:rgba(245,158,11,0.1);border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px"></div>'+
     '<div class="form-grid">'+
-    '<div class="field form-full"><label>Full Name *</label><input id="nc_name" placeholder="e.g. Maria Santos"></div>'+
-    '<div class="field"><label>Phone *</label><input id="nc_phone" placeholder="09171234567" type="tel"></div>'+
+    '<div class="field form-full"><label>Full Name *</label><input id="nc_name" placeholder="e.g. Maria Santos" oninput="checkDuplicateClient()"></div>'+
+    '<div class="field"><label>Phone *</label><input id="nc_phone" placeholder="09171234567" type="tel" oninput="checkDuplicateClient()"></div>'+
     '<div class="field"><label>Email</label><input id="nc_email" type="email" placeholder="maria@email.com"></div>'+
     '<div class="field form-full"><label>Address</label><input id="nc_address" placeholder="House/Street/Barangay/City"></div>'+
     '<div class="field form-full"><label>Landmark</label><input id="nc_landmark" placeholder="e.g. Tapat ng Jollibee, kanto ng simbahan"></div>'+
@@ -10697,6 +10750,35 @@ function saveNewClient(){
   closeModal('editModal');
   showToast('Client '+name+' added!','success');
   switchView('clients');
+}
+
+function checkDuplicateClient() {
+  var name = (document.getElementById('nc_name')?.value||'').trim().toLowerCase();
+  var phone = (document.getElementById('nc_phone')?.value||'').trim().replace(/\D/g,'');
+  var alert = document.getElementById('nc_dupeAlert');
+  if (!alert || (!name && !phone)) { if(alert)alert.style.display='none'; return; }
+  var clients = mergeClients();
+  var matches = clients.filter(function(c) {
+    if (phone && phone.length >= 7) {
+      var cp = (c.phone||'').replace(/\D/g,'');
+      if (cp && cp.includes(phone)) return true;
+    }
+    if (name && name.length >= 3) {
+      var cn = (c.name||'').toLowerCase();
+      if (cn.includes(name) || name.includes(cn)) return true;
+    }
+    return false;
+  });
+  if (!matches.length) { alert.style.display='none'; return; }
+  alert.style.display='block';
+  alert.innerHTML='<div style="font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ Possible existing client'+(matches.length>1?'s':'')+':</div>'+
+    matches.slice(0,3).map(function(c){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<div><strong>'+escH(c.name)+'</strong> · '+(c.phone||'—')
+        +'<div style="font-size:11px;color:var(--text-dim)">'+(c.lastService||'No service yet')+' · '+(c.lastServiceDate?formatDate(c.lastServiceDate):'No date')+'</div></div>'
+        +'<button class="btn btn-primary btn-xs" onclick="closeModal(\'editModal\');openClientModal(\''+(c.phone||c.name)+'\')">View</button>'
+        +'</div>';
+    }).join('');
 }
 
 /* ===========================
@@ -11515,6 +11597,36 @@ function renderSettings(){
         <div>👑 Only the <strong>Owner</strong> can add/remove accounts</div>
       </div>
     </div>
+
+    ${(isOwner||session.role==='admin') ? `
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">📅 Service Due Date Settings</div><div class="panel-subtitle">Configure service intervals and warning window for client follow-ups</div></div>
+      <div class="panel-body">
+        <div class="sec-divider">⏰ Warning Window</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:10px">How many days before the due date should clients turn 🔴 RED for follow-up?</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+          <input type="number" id="ss_warnDays" value="${SERVICE_SETTINGS.warningDays}" min="1" max="90" style="width:80px;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none">
+          <span style="font-size:13px">days before due date</span>
+          <button class="btn btn-gold btn-sm" onclick="saveWarningDays()">💾 Save</button>
+        </div>
+        <div class="sec-divider">🔧 Service Intervals (by AC Usage)</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:10px">Recommended cleaning interval per usage frequency. Used to auto-compute next service due date.</div>
+        <div id="ss_intervals">
+          ${SERVICE_SETTINGS.usageOpts.map(function(u,i){
+            return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+              +'<input id="ss_label_'+i+'" value="'+escH(u.label)+'" style="flex:1;padding:8px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12.5px;outline:none" placeholder="Label">'
+              +'<input type="number" id="ss_months_'+i+'" value="'+u.months+'" min="1" max="24" step="0.5" style="width:70px;padding:8px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12.5px;outline:none" placeholder="Months">'
+              +'<span style="font-size:12px;color:var(--text-dim);min-width:40px">months</span>'
+              +'</div>';
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-gold btn-sm" onclick="saveServiceIntervals()">💾 Save Intervals</button>
+          <button class="btn btn-outline btn-sm" onclick="resetServiceIntervals()">↩️ Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+    ` : ''}
 
     ${isOwner ? `
     <div class="panel">
