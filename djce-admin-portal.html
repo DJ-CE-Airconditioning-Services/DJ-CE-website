@@ -635,6 +635,16 @@ tr:hover td { background:var(--bg-elev2); }
 @media(max-width:600px){ .form-grid{grid-template-columns:1fr} }
 .form-full { grid-column:1/-1; }
 
+/* TECH PICKER — multi-select dropdown */
+.tech-picker { position:relative; }
+.tech-picker-toggle { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; cursor:pointer; min-height:38px; transition:border-color 0.2s; }
+.tech-picker-toggle:hover { border-color:var(--accent); }
+.tech-picker-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.tech-picker-dropdown { position:absolute; top:100%; left:0; right:0; background:var(--bg-elev); border:1.5px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.15); z-index:999; max-height:200px; overflow-y:auto; margin-top:4px; }
+.tech-picker-opt { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:13px; cursor:pointer; transition:background 0.15s; }
+.tech-picker-opt:hover { background:var(--bg-elev2); }
+.tech-picker-opt input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+
 /* SECTION DIVIDER */
 .sec-divider { font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-dim); font-weight:700; padding:8px 0; border-bottom:1px solid var(--border); margin-bottom:14px; }
 
@@ -1259,6 +1269,61 @@ function getTechnicians(){
   });
   return list.length ? list : ['Papa (Senior Tech)', 'Helper 1', 'Helper 2'];
 }
+
+// Parse technician string — supports comma-separated multiple techs
+function parseTechs(val){
+  if(!val) return [];
+  return val.split(',').map(function(s){return s.trim();}).filter(Boolean);
+}
+function techDisplay(val){
+  var arr = parseTechs(val);
+  if(!arr.length) return '';
+  return arr.join(', ');
+}
+
+// Multi-select technician picker component
+function renderTechPicker(pickerId, selected){
+  var techs = getTechnicians();
+  var sel = parseTechs(selected);
+  var html = '<div class="tech-picker" id="'+pickerId+'">';
+  html += '<div class="tech-picker-toggle" onclick="toggleTechPicker(\''+pickerId+'\')">';
+  html += '<span class="tech-picker-label">'+(sel.length ? '👷 '+sel.length+' selected' : '👷 Select technicians...')+'</span>';
+  html += '<span style="font-size:10px">▼</span></div>';
+  html += '<div class="tech-picker-dropdown" style="display:none">';
+  techs.forEach(function(t){
+    var chk = sel.indexOf(t)!==-1 ? 'checked' : '';
+    html += '<label class="tech-picker-opt"><input type="checkbox" value="'+escH(t)+'" '+chk+' onchange="updateTechPicker(\''+pickerId+'\')"> '+escH(t)+'</label>';
+  });
+  html += '</div></div>';
+  return html;
+}
+function toggleTechPicker(id){
+  var dd = document.querySelector('#'+id+' .tech-picker-dropdown');
+  if(dd) dd.style.display = dd.style.display==='none'?'block':'none';
+  // Close other pickers
+  document.querySelectorAll('.tech-picker-dropdown').forEach(function(el){
+    if(el !== dd) el.style.display='none';
+  });
+}
+function updateTechPicker(id){
+  var checks = document.querySelectorAll('#'+id+' input[type=checkbox]');
+  var sel = [];
+  checks.forEach(function(c){ if(c.checked) sel.push(c.value); });
+  var lbl = document.querySelector('#'+id+' .tech-picker-label');
+  if(lbl) lbl.textContent = sel.length ? '👷 '+sel.length+' selected: '+sel.join(', ') : '👷 Select technicians...';
+}
+function getTechPickerValue(id){
+  var checks = document.querySelectorAll('#'+id+' input[type=checkbox]');
+  var sel = [];
+  checks.forEach(function(c){ if(c.checked) sel.push(c.value); });
+  return sel.join(', ');
+}
+// Close picker when clicking outside
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.tech-picker')){
+    document.querySelectorAll('.tech-picker-dropdown').forEach(function(el){ el.style.display='none'; });
+  }
+});
 
 // Reference number service codes
 const SERVICE_CODES = {
@@ -2025,7 +2090,7 @@ function renderDashboard() {
             </div>
             <div style="flex:1;min-width:0">
               <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</div>
-              <div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔧 ${b.service||'—'} · 👷 ${b.technician||'Unassigned'}</div>
+              <div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔧 ${b.service||'—'} · 👷 ${techDisplay(b.technician)||'Unassigned'}</div>
             </div>
             <span class="status-badge s-${(b.status||'pending').toLowerCase().replace(/ /g,'-')}" style="flex-shrink:0">${b.status}</span>
           </div>`;
@@ -2122,7 +2187,7 @@ function isThisWeek(dateStr) {
 }
 
 function renderTechDash() {
-  const myJobs = Object.values(BOOKINGS).filter(b=>b.technician===session.name && b.status!=='Cancelled');
+  const myJobs = Object.values(BOOKINGS).filter(b=>parseTechs(b.technician).indexOf(session.name)!==-1 && b.status!=='Cancelled');
   const today = myJobs.filter(b=>isToday(b.date));
   const pending = myJobs.filter(b=>b.status==='Confirmed'||b.status==='Pending');
   const done = myJobs.filter(b=>b.status==='Done');
@@ -2228,7 +2293,7 @@ function renderBookings() {
 function renderBookingRows(bks) {
   if (!bks.length) return '<tr><td colspan="8"><div class="empty"><div class="empty-ic">📋</div>No bookings found</div></td></tr>';
   return bks.map(function(b){
-    var techHtml = b.technician||'<span style="color:var(--text-dim)">Unassigned</span>';
+    var techHtml = techDisplay(b.technician)||'<span style="color:var(--text-dim)">Unassigned</span>';
     var statusCls = (b.status||'pending').toLowerCase();
     var amtHtml = b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—';
     var btns = '<button class="btn btn-primary btn-xs" onclick="openBookingDetail(\''+b.id+'\')">View</button>';
@@ -2374,7 +2439,7 @@ function openBookingDetail(id) {
         <div class="info-row"><span class="info-label">Date</span><span class="info-val">${formatDate(b.date)}</span></div>
         <div class="info-row"><span class="info-label">Time</span><span class="info-val">${b.time||'—'}</span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="status-badge s-${(b.status||'pending').toLowerCase()}">${b.status||'Pending'}</span></span></div>
-        <div class="info-row"><span class="info-label">Technician</span><span class="info-val">${b.technician||'<em style="color:var(--text-dim)">Unassigned</em>'}</span></div>
+        <div class="info-row"><span class="info-label">Technician(s)</span><span class="info-val">${techDisplay(b.technician)||'<em style="color:var(--text-dim)">Unassigned</em>'}</span></div>
         <div class="info-row"><span class="info-label">Amount</span><span class="info-val">
           ${(()=>{
             if (!b.feeService && !b.feeParts && !b.feeTranspo && !b.feeOther && !b.feeDiscount) {
@@ -2431,8 +2496,8 @@ function openBookingDetail(id) {
     ${session.role!=='tech'?`
     <div class="sec-divider" style="margin-top:16px">Update Booking</div>
     <div class="form-grid">
-      <div class="field"><label>Assign Technician</label>
-        <select id="detTech"><option value="">— Select —</option>${getTechnicians().map(t=>`<option ${b.technician===t?'selected':''}>${t}</option>`).join('')}</select>
+      <div class="field"><label>Assign Technician(s)</label>
+        ${renderTechPicker('detTechPicker',b.technician||'')}
       </div>
       <div class="field"><label>Status</label>
         <select id="detStatus">
@@ -2616,7 +2681,7 @@ async function rescheduleBooking(id) {
 function updateBooking(id) {
   const b = BOOKINGS[id];
   if (!b) return;
-  const tech     = document.getElementById('detTech')?.value;
+  const tech     = getTechPickerValue('detTechPicker');
   const status   = document.getElementById('detStatus')?.value;
   const notes    = document.getElementById('detNotes')?.value;
   // Payment breakdown
@@ -2888,8 +2953,8 @@ function openNewBooking(name='',phone='',address='') {
         <select id="nb_time" onchange="toggleCustomTime(this)"><option>Morning (8AM–12PM)</option><option>Afternoon (1PM–5PM)</option><option>Flexible</option><option value="__custom">Specific Time…</option></select>
         <input type="time" id="nb_time_custom" style="display:none;margin-top:5px" onchange="this.dataset.set='1'">
       </div>
-      <div class="field"><label>Assign Technician</label>
-        <select id="nb_tech"><option value="">— To be assigned —</option>${getTechnicians().map(t=>`<option>${t}</option>`).join('')}</select>
+      <div class="field"><label>Assign Technician(s)</label>
+        ${renderTechPicker('nb_techPicker','')}
       </div>
       <div class="field"><label>⭐ Service Tier</label>
         <select id="nb_tier" onchange="updateTierBadge()"><option value="Normal">🟢 Normal</option><option value="VIP">⭐ VIP (+ additional fee)</option><option value="Rush">🔴 Rush (+ rush fee)</option></select>
@@ -2966,7 +3031,7 @@ async function saveBooking() {
     service, serviceDetails: fields, serviceDetailsSummary: summary,
     serviceTier: document.getElementById('nb_tier')?.value||'Normal',
     date, time: getSelectedTime(),
-    technician: document.getElementById('nb_tech')?.value||'',
+    technician: getTechPickerValue('nb_techPicker'),
     amount: document.getElementById('nb_amount')?.value||'',
     notes: document.getElementById('nb_notes')?.value||'',
     usage, nextCleaningDate: earliestNext || calcNextCleaning(date, usage),
@@ -3219,12 +3284,9 @@ function renderJobCard(b, tab, techOptions) {
   const borderColor = overdue ? 'var(--danger)' : today ? 'var(--accent)' : 'var(--border)';
 
   const quickAssign = isUnassigned ? `
-    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <select class="job-assign-sel" data-id="${b.id}" style="flex:1;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;outline:none">
-        <option value="">👷 Assign Tech...</option>
-        ${techOptions}
-      </select>
-      <button class="btn btn-primary btn-xs" onclick="quickAssignTech('${b.id}')">Assign</button>
+    <div style="margin-top:8px" onclick="event.stopPropagation()">
+      ${renderTechPicker('qaPicker_'+b.id,'')}
+      <button class="btn btn-primary btn-xs" style="margin-top:5px;width:100%" onclick="event.stopPropagation();quickAssignTech('${b.id}')">✅ Assign</button>
     </div>` : '';
 
   const statusActions = !isDone ? `
@@ -3248,7 +3310,7 @@ function renderJobCard(b, tab, techOptions) {
     <div class="bc-meta">
       <span class="bc-tag" style="background:${today?'var(--accent-soft)':'var(--bg-elev2)'};color:${today?'var(--accent)':'inherit'}">${today?'🔥 TODAY':'📅'} ${formatDate(b.date)}</span>
       ${overdue?`<span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">⏰ Overdue</span>`:''}
-      ${b.technician?`<span class="bc-tag" style="background:var(--bg-elev2)">👷 ${b.technician}</span>`:''}
+      ${b.technician?`<span class="bc-tag" style="background:var(--bg-elev2)">👷 ${techDisplay(b.technician)}</span>`:''}
       ${b.amount?`<span class="bc-tag" style="background:var(--accent-soft);color:var(--accent)">₱${parseFloat(b.amount).toLocaleString()}</span>`:''}
     </div>
     ${quickAssign}
@@ -3259,9 +3321,8 @@ function renderJobCard(b, tab, techOptions) {
 function quickAssignTech(id) {
   const b = BOOKINGS[id];
   if (!b) return;
-  const sel = document.querySelector(`.job-assign-sel[data-id="${id}"]`);
-  const tech = sel?.value;
-  if (!tech) { showToast('Select a technician first','warning'); return; }
+  const tech = getTechPickerValue('qaPicker_'+id);
+  if (!tech) { showToast('Select at least one technician','warning'); return; }
   b.technician = tech;
   b.status = 'Pending';
   b._dirty = true;
@@ -3312,7 +3373,7 @@ function renderBookingCard(b) {
     <div class="bc-service">🔧 ${b.service||'—'} ${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">🔴 Rush</span>':''}</div>
     <div class="bc-meta">
       <span class="bc-tag" style="background:var(--bg-elev2)">📅 ${formatDate(b.date)}</span>
-      <span class="bc-tag" style="background:var(--bg-elev2)">👷 ${b.technician||'Unassigned'}</span>
+      <span class="bc-tag" style="background:var(--bg-elev2)">👷 ${techDisplay(b.technician)||'Unassigned'}</span>
       ${b.amount?`<span class="bc-tag" style="background:var(--accent-soft);color:var(--accent)">₱${parseFloat(b.amount).toLocaleString()}</span>`:''}
     </div>
   </div>`;
@@ -3322,7 +3383,7 @@ function renderBookingCard(b) {
    MY JOBS (TECH)
 =========================== */
 function renderMyJobs() {
-  const myJobs = Object.values(BOOKINGS).filter(b=>b.technician===session.name).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const myJobs = Object.values(BOOKINGS).filter(b=>parseTechs(b.technician).indexOf(session.name)!==-1).sort((a,b)=>new Date(a.date)-new Date(b.date));
   const active = myJobs.filter(b=>b.status!=='Done'&&b.status!=='Cancelled');
   const today = new Date().toISOString().split('T')[0];
   const todayJobs = active.filter(b=>b.date===today);
@@ -3461,7 +3522,7 @@ function techStartWork(id) {
   var now = new Date();
   var today = now.toISOString().split('T')[0];
   var overlap = Object.values(BOOKINGS).find(function(ob){
-    return ob.id!==id && ob.technician===b.technician && ob.date===today && ob.actualStart && !ob.actualEnd;
+    return ob.id!==id && parseTechs(ob.technician).some(function(t){return parseTechs(b.technician).indexOf(t)!==-1;}) && ob.date===today && ob.actualStart && !ob.actualEnd;
   });
   if (overlap) {
     if (!confirm('⚠️ You have another job still in progress ('+overlap.id+' — '+overlap.service+').\n\nThat job\'s End Work will be auto-recorded now.\n\nContinue?')) return;
@@ -3662,7 +3723,7 @@ function filterClientsView(q) {
 function renderSchedule() {
   const todayStr = new Date().toISOString().split('T')[0];
   const isOwnerAdmin = session.role==='owner'||session.role==='admin';
-  const allTechs = [...new Set(Object.values(BOOKINGS).map(b=>b.technician).filter(Boolean))].sort();
+  const allTechs = [...new Set(Object.values(BOOKINGS).flatMap(b=>parseTechs(b.technician)))].sort();
 
   return `<div style="margin-bottom:16px">
     <div style="display:flex;gap:8px;border-bottom:2px solid var(--border);margin-bottom:18px">
@@ -4359,7 +4420,7 @@ function buildScheduleHtml(fromDate, toDate, techFilter, _unused) {
   if (techFilter==='unassigned') {
     bks = bks.filter(b=>!b.technician||b.technician==='');
   } else if (techFilter) {
-    bks = bks.filter(b=>b.technician===techFilter);
+    bks = bks.filter(b=>parseTechs(b.technician).indexOf(techFilter)!==-1);
   }
 
   bks.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -4390,7 +4451,7 @@ function buildScheduleHtml(fromDate, toDate, techFilter, _unused) {
               <div style="flex:1">
                 <div class="cc-title">${b.name} · ${b.service}</div>
                 <div class="cc-meta">
-                  👷 <strong style="color:${unassigned?'var(--warning)':'inherit'}">${b.technician||'⚠️ Unassigned'}</strong>
+                  👷 <strong style="color:${unassigned?'var(--warning)':'inherit'}">${techDisplay(b.technician)||'⚠️ Unassigned'}</strong>
                   · 🕐 ${b.time||'TBD'}
                   · 📍 ${b.address||'—'}
                   ${b.amount?`· <span style="color:var(--accent)">₱${parseFloat(b.amount).toLocaleString()}</span>`:''}
@@ -4563,7 +4624,7 @@ function renderBackjobHistory() {
       +'<td><strong>'+b.id+'</strong></td>'
       +'<td>'+b.name+'</td>'
       +'<td>'+b.service+'</td>'
-      +'<td>'+(b.technician||'Unassigned')+'</td>'
+      +'<td>'+(techDisplay(b.technician)||'Unassigned')+'</td>'
       +'<td>'+formatDate(b.date)+'</td>'
       +'<td><span class="status-badge s-for-backjob">For Backjob</span></td>'
       +'<td><button class="btn btn-outline btn-xs" onclick="openBookingDetail(\''+b.id+'\')">👁️ View</button></td>'
@@ -4989,7 +5050,7 @@ function renderReceipts() {
     <div class="panel-body">
       <div class="tbl-wrap"><table>
         <thead><tr><th>Booking ID</th><th>Client</th><th>Service</th><th>Date</th><th>Technician</th><th>Amount</th><th>Actions</th></tr></thead>
-        <tbody>${(function(){if(!done.length)return '<tr><td colspan="7"><div class="empty"><div class="empty-ic">🧾</div>No completed jobs yet</div></td></tr>';return done.map(function(b){return '<tr><td style="font-family:monospace;font-size:11px;color:var(--accent)">'+b.id+'</td><td><strong>'+b.name+'</strong></td><td style="font-size:12px">'+(b.service||'—')+'</td><td>'+formatDate(b.date)+'</td><td>'+(b.technician||'—')+'</td><td><strong style="color:var(--accent)">'+(b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—')+'</strong></td><td><button class="btn btn-gold btn-xs" data-bid="'+b.id+'" onclick="openReceiptModal(this.dataset.bid)">🧾 Receipt</button> <button class="btn btn-primary btn-xs" data-bid="'+b.id+'" onclick="openReceiptModal(this.dataset.bid,\'jo\')">📋 Job Order</button></td></tr>';}).join('');})()}</tbody>
+        <tbody>${(function(){if(!done.length)return '<tr><td colspan="7"><div class="empty"><div class="empty-ic">🧾</div>No completed jobs yet</div></td></tr>';return done.map(function(b){return '<tr><td style="font-family:monospace;font-size:11px;color:var(--accent)">'+b.id+'</td><td><strong>'+b.name+'</strong></td><td style="font-size:12px">'+(b.service||'—')+'</td><td>'+formatDate(b.date)+'</td><td>'+(techDisplay(b.technician)||'—')+'</td><td><strong style="color:var(--accent)">'+(b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—')+'</strong></td><td><button class="btn btn-gold btn-xs" data-bid="'+b.id+'" onclick="openReceiptModal(this.dataset.bid)">🧾 Receipt</button> <button class="btn btn-primary btn-xs" data-bid="'+b.id+'" onclick="openReceiptModal(this.dataset.bid,\'jo\')">📋 Job Order</button></td></tr>';}).join('');})()}</tbody>
       </table></div>
     </div>
   </div>`;
@@ -5044,7 +5105,7 @@ function openReceiptModal(id, type='receipt') {
           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:11px">
             <span style="font-weight:700;color:#0d1f3c;white-space:nowrap">DATE:</span><span>${dateStr}</span>
             <span style="font-weight:700;color:#0d1f3c;white-space:nowrap">SERVICE DATE:</span><span>${svcDateStr}</span>
-            <span style="font-weight:700;color:#0d1f3c;white-space:nowrap">TECHNICIAN:</span><span>${b.technician||'—'}</span>
+            <span style="font-weight:700;color:#0d1f3c;white-space:nowrap">TECHNICIAN:</span><span>${techDisplay(b.technician)||'—'}</span>
             <span style="font-weight:700;color:#0d1f3c;white-space:nowrap">STATUS:</span>
             <span><span style="background:${b.status==='Done'?'#d4edda':b.status==='Pending'?'#fff3cd':'#dbeafe'};color:${b.status==='Done'?'#155724':b.status==='Pending'?'#856404':'#1e40af'};padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700">${b.status||'—'}</span></span>
           </div>
@@ -5457,7 +5518,7 @@ function generateServiceAgreement(id) {
     +'<tr><td>Service Type</td><td><strong>'+(b.service||'—')+'</strong></td></tr>'
     +'<tr><td>Scheduled Date</td><td>'+formatDate(b.date)+'</td></tr>'
     +'<tr><td>Scheduled Time</td><td>'+(b.time||'To be confirmed')+'</td></tr>'
-    +'<tr><td>Assigned Technician</td><td>'+(b.technician||'To be assigned')+'</td></tr>'
+    +'<tr><td>Assigned Technician(s)</td><td>'+(techDisplay(b.technician)||'To be assigned')+'</td></tr>'
     +'<tr><td>Notes / Special Instructions</td><td>'+(b.notes||'None')+'</td></tr>'
     +'</table></div>'
 
@@ -6029,7 +6090,7 @@ function printQRSticker(bookingId) {
   var address = b.fullAddress || b.address || '';
   var serviceType = b.service || 'Aircon Service';
   var dateStr = b.date || '';
-  var technician = b.technician || '';
+  var technician = techDisplay(b.technician) || '';
 
   // Calculate next cleaning (6 months from service date)
   var nextCleaning = '';
@@ -6315,7 +6376,7 @@ function buildRevenueContent(from, to) {
         +'<td><strong>'+b.name+'</strong></td>'
         +'<td style="font-size:12px">'+b.service+'</td>'
         +'<td style="font-size:12px">'+formatDate(b.date)+'</td>'
-        +'<td style="font-size:12px">'+(b.technician||'—')+'</td>'
+        +'<td style="font-size:12px">'+(techDisplay(b.technician)||'—')+'</td>'
         +'<td style="font-weight:700;color:var(--accent)">₱'+parseFloat(b.amount||0).toLocaleString()+'</td>'
         +'</tr>';
     }).join('');
@@ -6478,7 +6539,7 @@ function openPayslip(empId) {
 
   // Count jobs done this month for this technician
   const jobsDone = Object.values(BOOKINGS).filter(b=>
-    b.status==='Done' && b.technician===emp.name &&
+    b.status==='Done' && parseTechs(b.technician).indexOf(emp.name)!==-1 &&
     b.date && b.date>=periodStart && b.date<=periodEnd
   ).length;
 
@@ -6791,7 +6852,7 @@ function buildReportsContent(ym) {
 
   // Tech performance
   const techMap = {};
-  done.forEach(b=>{ if(b.technician){if(!techMap[b.technician])techMap[b.technician]={jobs:0,rev:0};techMap[b.technician].jobs++;techMap[b.technician].rev+=(parseFloat(b.amount)||0);} });
+  done.forEach(b=>{ if(b.technician){parseTechs(b.technician).forEach(function(t){if(!techMap[t])techMap[t]={jobs:0,rev:0};techMap[t].jobs++;techMap[t].rev+=(parseFloat(b.amount)||0);});} });
   const techSorted = Object.entries(techMap).sort((a,b)=>b[1].jobs-a[1].jobs);
 
   // Weekly breakdown
@@ -7186,7 +7247,7 @@ function _generateMonthlyReportPDFInner() {
   const svcSorted = Object.entries(svcMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
   const techMap = {};
-  done.forEach(b=>{ if(b.technician){if(!techMap[b.technician])techMap[b.technician]={jobs:0,rev:0};techMap[b.technician].jobs++;techMap[b.technician].rev+=(parseFloat(b.amount)||0);}});
+  done.forEach(b=>{ if(b.technician){parseTechs(b.technician).forEach(function(t){if(!techMap[t])techMap[t]={jobs:0,rev:0};techMap[t].jobs++;techMap[t].rev+=(parseFloat(b.amount)||0);});}});
   const techSorted = Object.entries(techMap).sort((a,b)=>b[1].jobs-a[1].jobs);
 
   const weeks = [];
@@ -7676,13 +7737,15 @@ function renderAcctDaily() {
   // Get existing daily log entries for this date
   var dayLogs = ACCT_DAILY_LOG.filter(function(l){return l.date===selDate;});
 
-  // Build auto-attendance from jobs
+  // Build auto-attendance from jobs (multi-tech: each tech gets counted)
   var techAttendance = {};
   dayJobs.forEach(function(b){
     if (b.technician) {
-      if (!techAttendance[b.technician]) techAttendance[b.technician] = {jobs:0, bookingIds:[]};
-      techAttendance[b.technician].jobs++;
-      techAttendance[b.technician].bookingIds.push(b.id);
+      parseTechs(b.technician).forEach(function(t){
+        if (!techAttendance[t]) techAttendance[t] = {jobs:0, bookingIds:[]};
+        techAttendance[t].jobs++;
+        techAttendance[t].bookingIds.push(b.id);
+      });
     }
   });
 
@@ -7726,7 +7789,7 @@ function renderAcctDaily() {
       return '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">'
         +'<span style="font-weight:700;min-width:80px;color:var(--accent)">'+b.id+'</span>'
         +'<span style="flex:1">'+b.name+' — '+b.service+'</span>'
-        +'<span>👷 '+(b.technician||'Unassigned')+'</span>'
+        +'<span>👷 '+(techDisplay(b.technician)||'Unassigned')+'</span>'
         +'<span class="status-badge s-'+(b.status||'pending').toLowerCase().replace(/ /g,'-')+'" style="font-size:10px">'+b.status+'</span>'
         +'</div>';
     }).join('')+'</div>' : '')
@@ -7779,12 +7842,13 @@ function renderAcctTimekeeping() {
     return b.date === selDate && b.technician;
   });
 
-  // Group by technician
+  // Group by technician (each tech in a multi-assign gets the booking)
   var techMap = {};
   dayBookings.forEach(function(b) {
-    var tech = b.technician;
-    if (!techMap[tech]) techMap[tech] = [];
-    techMap[tech].push(b);
+    parseTechs(b.technician).forEach(function(tech){
+      if (!techMap[tech]) techMap[tech] = [];
+      techMap[tech].push(b);
+    });
   });
 
   // Build timesheet rows
@@ -7838,18 +7902,18 @@ function renderAcctTimekeeping() {
   var laborHtml = '';
   var allWithTime = Object.values(BOOKINGS).filter(function(b) { return b.date === selDate && b.technician && b.actualStart && b.actualEnd; });
   if (allWithTime.length) {
-    // Group by technician for allocation
+    // Group by technician for allocation (multi-tech: each tech gets the booking)
     var allocMap = {};
     allWithTime.forEach(function(b) {
-      var tech = b.technician;
-      if (!allocMap[tech]) allocMap[tech] = {jobs:[], totalHrs:0, emp:null};
-      var hrs = parseFloat(calcActualHours(b.actualStart, b.actualEnd));
-      allocMap[tech].jobs.push({booking:b, hrs:hrs});
-      allocMap[tech].totalHrs += hrs;
-      // Find employee record
-      if (!allocMap[tech].emp) {
-        allocMap[tech].emp = ACCT_EMPLOYEES.find(function(e){ return e.name === tech; });
-      }
+      parseTechs(b.technician).forEach(function(tech){
+        if (!allocMap[tech]) allocMap[tech] = {jobs:[], totalHrs:0, emp:null};
+        var hrs = parseFloat(calcActualHours(b.actualStart, b.actualEnd));
+        allocMap[tech].jobs.push({booking:b, hrs:hrs});
+        allocMap[tech].totalHrs += hrs;
+        if (!allocMap[tech].emp) {
+          allocMap[tech].emp = ACCT_EMPLOYEES.find(function(e){ return e.name === tech; });
+        }
+      });
     });
 
     laborHtml = '<div style="margin-top:20px"><div style="font-weight:700;font-size:14px;margin-bottom:10px">💰 Labor Cost Allocation</div>';
@@ -7905,10 +7969,12 @@ function renderAcctTimekeeping() {
   if (monthBookings.length) {
     var invTotal=0, regTotal=0, invJobs=0, regJobs=0;
     monthBookings.forEach(function(b) {
-      var emp = ACCT_EMPLOYEES.find(function(e){ return e.name === b.technician; });
+      var techs = parseTechs(b.technician);
+      var firstTech = techs[0]||'';
+      var emp = ACCT_EMPLOYEES.find(function(e){ return e.name === firstTech; });
       var rate = emp ? parseFloat(emp.dailyRate)||0 : 0;
       // Find all jobs for this tech on this date to calculate proportion
-      var sameTechDay = monthBookings.filter(function(ob){ return ob.technician === b.technician && ob.date === b.date; });
+      var sameTechDay = monthBookings.filter(function(ob){ return parseTechs(ob.technician).indexOf(firstTech)!==-1 && ob.date === b.date; });
       var dayTotalHrs = 0;
       sameTechDay.forEach(function(ob){ dayTotalHrs += parseFloat(calcActualHours(ob.actualStart, ob.actualEnd)); });
       var hrs = parseFloat(calcActualHours(b.actualStart, b.actualEnd));
