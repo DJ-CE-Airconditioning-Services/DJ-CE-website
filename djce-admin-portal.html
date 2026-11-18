@@ -124,7 +124,8 @@ body::after {
 .pwa-standalone .main { margin-left:0 !important; min-width:0 !important; overflow-x:hidden !important; width:100% !important; }
 .pwa-standalone .content { padding:16px 18px !important; min-width:0 !important; overflow-x:hidden !important; }
 .pwa-standalone .stats-grid { grid-template-columns:repeat(2,1fr) !important; }
-.pwa-standalone .topbar { padding:0 16px !important; }
+.pwa-standalone .topbar { padding:0 16px !important; padding-top:env(safe-area-inset-top, 0px) !important; height:auto !important; min-height:62px !important; }
+.pwa-standalone #pwaInstallBtn { display:none !important; }
 .pwa-standalone #sbCollapseBtn { display:none !important; }
 .pwa-standalone .sidebar.collapsed ~ .main { margin-left:0 !important; }
 
