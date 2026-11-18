@@ -2686,8 +2686,9 @@ async function rescheduleBooking(id) {
       saveLocalData();
       showToast('Rescheduled! '+(res.emailSent?'Email sent to '+b.email:'No email (no client email)'),'success');
       logActivity('📅','Rescheduled '+id+': '+formatDate(oldDate)+' '+oldTime+' → '+formatDate(newDate)+' '+newTime+(reason?' ('+reason+')':''),'booking');
-      closeModal('bookingModal');
-      switchView('bookings');
+      openBookingDetail(id);
+      var av = document.querySelector('.view.active');
+      if(av) av.innerHTML = renderView(av.id.replace('view-',''));
     } else {
       showToast(res?.error||'Failed to reschedule','error');
     }
@@ -2752,10 +2753,17 @@ function updateBooking(id) {
   }
   logActivity('✏️', `Updated booking ${id} — Status: ${status}, Tech: ${tech||b.technician}, Amount: ₱${amount.toLocaleString()}`, 'booking');
   addNotif(`Booking ${id} updated to ${status}`, 'info', id);
-  closeModal('bookingModal');
-  switchView('bookings');
-  showToast('Booking updated! Syncing to Sheets...', 'success');
+  // Stay on current page — just refresh the detail view in place
+  showToast('✅ Booking updated! Syncing to Sheets...', 'success');
   updateNavBadges();
+  // Refresh the booking detail to show updated values
+  openBookingDetail(id);
+  // Silently refresh the view behind the modal so data is fresh when modal is closed
+  var activeView = document.querySelector('.view.active');
+  if(activeView){
+    var vName = activeView.id.replace('view-','');
+    activeView.innerHTML = renderView(vName);
+  }
 }
 
 function markDone(id) {
@@ -3100,9 +3108,12 @@ async function saveBooking() {
   }
 
   closeModal('editModal');
-  switchView('bookings');
   showToast(`Booking created! Ref: ${refNo}`, 'success');
   updateNavBadges();
+  // Refresh current view and open the new booking
+  var av = document.querySelector('.view.active');
+  if(av) av.innerHTML = renderView(av.id.replace('view-',''));
+  openBookingDetail(id);
 }
 
 /* ===========================
