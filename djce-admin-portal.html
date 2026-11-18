@@ -3095,6 +3095,7 @@ function renderJobs() {
     {id:'done',label:'🏁 Done',count:done.length,warn:false},
     {id:'cancelled',label:'❌ Cancelled',count:cancelled.length,warn:false},
     {id:'waitlist',label:'📋 Waiting List',count:WAITLIST.length,warn:WAITLIST.length>0},
+    {id:'daily',label:'📅 Daily View',count:'',warn:false},
   ];
 
   const tabData = {unassigned,pending,confirmed,ongoing,backjob,done,cancelled,waitlist:WAITLIST};
@@ -3115,12 +3116,14 @@ function renderJobs() {
 
   const tabsHtml = `<div class="tabs" id="jobTabs">${tabs.map(t=>`
     <div class="tab ${t.id===active?'active':''}" onclick="switchJobTab('${t.id}')">
-      ${t.label} <span style="background:var(--bg-elev2);color:${t.warn?'var(--warning)':'var(--text-dim)'};padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px">${t.count}</span>
+      ${t.label} ${t.count!==''?`<span style="background:var(--bg-elev2);color:${t.warn?'var(--warning)':'var(--text-dim)'};padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px">${t.count}</span>`:''}
     </div>`).join('')}
   </div>`;
 
   let cardsHtml;
-  if (active === 'waitlist') {
+  if (active === 'daily') {
+    cardsHtml = renderJobsDailyView();
+  } else if (active === 'waitlist') {
     cardsHtml = WAITLIST.length
       ? `<div class="booking-grid" id="jobCards">${WAITLIST.map(w=>renderWaitlistCard(w)).join('')}</div>`
       : `<div class="empty" id="jobCards"><div class="empty-ic">📋</div><p>No clients on the waiting list</p></div>`;
@@ -3144,6 +3147,132 @@ function renderJobs() {
       ${cardsHtml}
     </div>
   </div>`;
+}
+
+var jobsDailyDate = new Date().toISOString().split('T')[0];
+
+function renderJobsDailyView(){
+  var selDate = jobsDailyDate;
+  var allBks = Object.values(BOOKINGS).filter(function(b){return b.status!=='Deleted';});
+  var dayBks = allBks.filter(function(b){return b.date===selDate;});
+  dayBks.sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
+
+  // Group by technician
+  var techGroups = {};
+  var unassignedJobs = [];
+  dayBks.forEach(function(b){
+    var techs = parseTechs(b.technician);
+    if(!techs.length){
+      unassignedJobs.push(b);
+    } else {
+      techs.forEach(function(t){
+        if(!techGroups[t]) techGroups[t]=[];
+        techGroups[t].push(b);
+      });
+    }
+  });
+
+  // Stats
+  var totalJobs = dayBks.length;
+  var doneJobs = dayBks.filter(function(b){return b.status==='Done';}).length;
+  var totalRev = dayBks.filter(function(b){return b.status==='Done';}).reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
+  var techCount = Object.keys(techGroups).length;
+
+  // Navigation
+  var prevDate = new Date(selDate+'T00:00:00');
+  prevDate.setDate(prevDate.getDate()-1);
+  var nextDate = new Date(selDate+'T00:00:00');
+  nextDate.setDate(nextDate.getDate()+1);
+  var prevStr = prevDate.toISOString().split('T')[0];
+  var nextStr = nextDate.toISOString().split('T')[0];
+  var isT = selDate === new Date().toISOString().split('T')[0];
+  var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(selDate+'T00:00:00').getDay()];
+
+  var html = '<div id="jobCards">';
+  // Date nav
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap">';
+  html += '<div style="display:flex;align-items:center;gap:8px">';
+  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(\''+prevStr+'\')">◀</button>';
+  html += '<input type="date" value="'+selDate+'" onchange="jobsDailyNav(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">';
+  html += '<button class="btn btn-outline btn-sm" onclick="jobsDailyNav(\''+nextStr+'\')">▶</button>';
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:8px">';
+  if(!isT) html += '<button class="btn btn-primary btn-xs" onclick="jobsDailyNav(\''+new Date().toISOString().split('T')[0]+'\')">Today</button>';
+  html += '<span style="font-size:14px;font-weight:700;color:'+(isT?'var(--accent)':'var(--text)')+'">'+dayName+', '+formatDate(selDate)+(isT?' (TODAY)':'')+'</span>';
+  html += '</div></div>';
+
+  // Day summary stats
+  html += '<div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin-bottom:16px">';
+  html += '<div class="stat-card stat-primary"><div class="stat-icon">📋</div><div class="stat-label">Total Jobs</div><div class="stat-value">'+totalJobs+'</div></div>';
+  html += '<div class="stat-card stat-success"><div class="stat-icon">✅</div><div class="stat-label">Done</div><div class="stat-value">'+doneJobs+'</div></div>';
+  html += '<div class="stat-card stat-gold"><div class="stat-icon">💰</div><div class="stat-label">Revenue</div><div class="stat-value">₱'+totalRev.toLocaleString()+'</div></div>';
+  html += '<div class="stat-card stat-info"><div class="stat-icon">👷</div><div class="stat-label">Technicians</div><div class="stat-value">'+techCount+'</div></div>';
+  html += '</div>';
+
+  if(!dayBks.length){
+    html += '<div class="empty"><div class="empty-ic">📅</div><p>No jobs on this date</p></div>';
+    html += '</div>';
+    return html;
+  }
+
+  // Render each tech group
+  var techNames = Object.keys(techGroups).sort();
+  techNames.forEach(function(tech){
+    var jobs = techGroups[tech];
+    var techDone = jobs.filter(function(b){return b.status==='Done';}).length;
+    var techRev = jobs.filter(function(b){return b.status==='Done';}).reduce(function(s,b){return s+(parseFloat(b.amount)||0);},0);
+    html += '<div style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
+    html += '<div style="padding:10px 14px;background:var(--bg-elev);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">';
+    html += '<div style="font-weight:700;font-size:14px">👷 '+escH(tech)+'</div>';
+    html += '<div style="display:flex;gap:10px;font-size:12px;color:var(--text-dim)">';
+    html += '<span>📋 '+jobs.length+' job'+(jobs.length!==1?'s':'')+'</span>';
+    html += '<span>✅ '+techDone+' done</span>';
+    html += '<span style="color:var(--accent);font-weight:700">💰 ₱'+techRev.toLocaleString()+'</span>';
+    html += '</div></div>';
+    // Job rows
+    jobs.forEach(function(b){
+      var sCls = (b.status||'pending').toLowerCase().replace(/ /g,'-');
+      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+b.id+'\')">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-weight:600;font-size:13px">'+escH(b.name||'—')+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+' · 📍 '+escH(b.address||'—')+'</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;white-space:nowrap">';
+      if(b.amount) html += '<div style="font-weight:700;color:var(--accent);font-size:13px">₱'+parseFloat(b.amount).toLocaleString()+'</div>';
+      html += '<span class="status-badge s-'+sCls+'" style="font-size:10px">'+b.status+'</span>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  });
+
+  // Unassigned jobs
+  if(unassignedJobs.length){
+    html += '<div style="margin-bottom:16px;border:1.5px solid var(--warning);border-radius:10px;overflow:hidden">';
+    html += '<div style="padding:10px 14px;background:rgba(245,158,11,0.1);display:flex;align-items:center;justify-content:space-between">';
+    html += '<div style="font-weight:700;font-size:14px;color:var(--warning)">⚠️ Unassigned</div>';
+    html += '<span style="font-size:12px;color:var(--text-dim)">'+unassignedJobs.length+' job'+(unassignedJobs.length!==1?'s':'')+'</span>';
+    html += '</div>';
+    unassignedJobs.forEach(function(b){
+      var sCls = (b.status||'pending').toLowerCase().replace(/ /g,'-');
+      html += '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openBookingDetail(\''+b.id+'\')">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-weight:600;font-size:13px">'+escH(b.name||'—')+'</div>';
+      html += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">🔧 '+escH(b.service||'—')+' · 🕐 '+(b.time||'TBD')+'</div>';
+      html += '</div>';
+      html += '<span class="status-badge s-'+sCls+'" style="font-size:10px">'+b.status+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function jobsDailyNav(dateStr){
+  jobsDailyDate = dateStr;
+  var cont = document.getElementById('jobCards');
+  if(cont) cont.outerHTML = renderJobsDailyView();
 }
 
 function switchJobTab(tab) {
