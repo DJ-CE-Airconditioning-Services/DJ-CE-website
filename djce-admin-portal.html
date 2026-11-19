@@ -7223,10 +7223,6 @@ function syncHouseholdBudgetsToSheets() {
     .catch(()=>{});
 }
 
-function syncServiceCatalogToSheets() {
-  callSheets({ action:'saveServiceCatalog', data:encodeURIComponent(JSON.stringify({ catalog: SERVICE_CATALOG })) })
-    .then(res=>{ if(res&&res.ok) console.log('Service catalog synced'); }).catch(()=>{});
-}
 function syncTranspoFeesToSheets() {
   callSheets({ action:'saveTranspoFees', data:encodeURIComponent(JSON.stringify({ fees: TRANSPO_FEES })) })
     .then(res=>{ if(res&&res.ok) console.log('Transpo fees synced'); }).catch(()=>{});
@@ -10875,7 +10871,6 @@ function saveLocalData() {
   localStorage.setItem('djce_log', JSON.stringify(ACTIVITY_LOG));
   localStorage.setItem('djce_archived', JSON.stringify(ARCHIVED_BOOKINGS));
   localStorage.setItem('djce_expenses', JSON.stringify(EXPENSES));
-  localStorage.setItem('djce_service_catalog', JSON.stringify(SERVICE_CATALOG));
   try { localStorage.setItem('djce_photos', JSON.stringify(BOOKING_PHOTOS)); } catch(e) { console.warn('Photos too large for localStorage — clearing oldest'); }
   localStorage.setItem('djce_comm_log', JSON.stringify(COMM_LOG));
   localStorage.setItem('djce_inventory', JSON.stringify(INVENTORY));
@@ -10887,7 +10882,6 @@ function saveLocalData() {
   // Debounced sync to Google Sheets (waits 3s after last save to batch changes)
   if (_sheetSyncTimer) clearTimeout(_sheetSyncTimer);
   _sheetSyncTimer = setTimeout(function(){
-    syncServiceCatalogToSheets();
     syncInventoryToSheets();
     syncFeedbackToSheets();
     syncWarrantyLogToSheets();
@@ -11180,17 +11174,7 @@ async function fetchFromSheets() {
       }
     } catch(hbErr) { console.log('Household budgets sync skipped:', hbErr); }
 
-    // 9. Service Catalog
-    try {
-      const scData = await callSheets({ action: 'getServiceCatalog' });
-      if (scData && scData.ok && scData.catalog && Object.keys(scData.catalog).length) {
-        SERVICE_CATALOG = scData.catalog;
-        // Ensure defaults exist
-        Object.keys(DEFAULT_SERVICE_CATALOG).forEach(function(k){ if(!SERVICE_CATALOG[k]) SERVICE_CATALOG[k]=JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATALOG[k])); });
-      }
-    } catch(e) { console.log('Service catalog sync skipped:', e); }
-
-    // 10. Transportation Fees
+    // 9. Transportation Fees
     try {
       const tfData = await callSheets({ action: 'getTranspoFees' });
       if (tfData && tfData.ok && tfData.fees && Object.keys(tfData.fees).length) {
@@ -12888,154 +12872,8 @@ function renderSettings(){
     </div>
     ` : ''}
 
-    ${(session.role==='owner'||session.role==='admin') ? renderServiceCatalog() : ''}
+    ${(session.role==='owner'||session.role==='admin') ? renderTranspoFeeSettings() : ''}
   </div>`;
-}
-
-function renderServiceCatalog() {
-  var cats = {};
-  Object.values(SERVICE_CATALOG).forEach(function(s) {
-    if (!cats[s.category]) cats[s.category] = [];
-    cats[s.category].push(s);
-  });
-  var html = '';
-  var catOrder = ['Aircon','Appliance','Electrical','Plumbing','Other'];
-  catOrder.forEach(function(cat){
-    if(!cats[cat]) return;
-    html += '<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);padding:6px 0">'+cat+'</div>';
-    cats[cat].forEach(function(s){
-      var eName = s.name.replace(/'/g,"\\'");
-      var hasMatrix = s.priceMatrix && s.priceMatrix.length > 0;
-      var priceLabel = hasMatrix ? s.priceMatrix.length+' price'+(s.priceMatrix.length>1?'s':'') : (s.basePrice ? '₱'+parseFloat(s.basePrice).toLocaleString() : 'On-site');
-      var priceBg = hasMatrix ? 'background:var(--accent-soft);color:var(--accent)' : (s.basePrice ? 'background:var(--success-soft,rgba(16,185,129,.12));color:var(--success)' : 'color:var(--text-dim)');
-      html += '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">';
-      html += '<div onclick="toggleCatalogAccordion(\'cat_'+eName+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer">';
-      html += '<span style="font-size:14px">'+(cat==='Aircon'?'🧊':cat==='Appliance'?'🫧':cat==='Electrical'?'⚡':cat==='Plumbing'?'🔧':'📋')+'</span>';
-      html += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+s.name+'</div>';
-      html += '<div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.description||'')+'</div></div>';
-      html += '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;white-space:nowrap;'+priceBg+'">'+priceLabel+'</span>';
-      html += '<button class="btn btn-primary btn-xs" onclick="event.stopPropagation();editCatalogService(\''+eName+'\')" title="Edit Service">✏️</button>';
-      html += '<span id="cat_'+eName+'_arrow" style="font-size:10px;color:var(--text-dim);transition:transform .2s">▼</span>';
-      html += '</div>';
-      // Expandable matrix
-      html += '<div id="cat_'+eName+'" style="display:none;border-top:1px solid var(--border);padding:10px 14px;background:var(--bg-elev1,var(--bg))">';
-      if(hasMatrix){
-        html += '<div class="tbl-wrap"><table style="font-size:12px"><thead><tr><th>Type</th><th>HP</th><th>Inverter</th><th style="text-align:right">Price</th><th></th></tr></thead><tbody>';
-        s.priceMatrix.forEach(function(m,mi){
-          html += '<tr><td>'+(m.actype||'—')+'</td><td>'+(m.hp||'Any')+'</td>';
-          html += '<td>'+(m.inverter==='Yes'?'<span style="color:var(--info);font-weight:600">✓ Inverter</span>':m.inverter==='No'?'Non-Inv':'—')+'</td>';
-          html += '<td style="text-align:right;font-weight:700;color:var(--accent)">₱'+parseFloat(m.price).toLocaleString()+'</td>';
-          html += '<td style="white-space:nowrap"><button class="btn btn-warning btn-xs" onclick="editPriceEntry(\''+eName+'\','+mi+')" title="Edit" style="margin-right:4px">✏️</button><button class="btn btn-danger btn-xs" onclick="removePriceEntry(\''+eName+'\','+mi+')" title="Remove">✕</button></td></tr>';
-        });
-        html += '</tbody></table></div>';
-      } else if(s.basePrice){
-        html += '<div style="font-size:12px;color:var(--text-dim)">Fixed price: <strong style="color:var(--accent)">₱'+parseFloat(s.basePrice).toLocaleString()+'</strong> — no matrix needed</div>';
-      } else {
-        html += '<div style="font-size:12px;color:var(--text-dim)">On-site pricing — no fixed rate</div>';
-      }
-      html += '<div style="margin-top:8px"><button class="btn btn-outline btn-xs" onclick="addPriceEntry(\''+eName+'\')">➕ Add Price</button></div>';
-      html += '</div></div>';
-    });
-    html += '</div>';
-  });
-  return '<div class="panel">'
-    +'<div class="panel-head"><div class="panel-title">📋 Service Catalog — Price Matrix</div></div>'
-    +'<div class="panel-body">'
-    +'<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:12px">Set exact prices per service × type × HP × inverter. Click a service to view/manage its price matrix. Auto-computed pag may booking.</div>'
-    +html
-    +'<div style="margin-top:12px"><button class="btn btn-gold btn-sm" onclick="addNewCatalogService()">➕ Add New Service</button></div>'
-    +'</div></div>'
-    +renderTranspoFeeSettings();
-}
-
-function toggleCatalogAccordion(id){
-  var el=document.getElementById(id);
-  var arrow=document.getElementById(id+'_arrow');
-  if(!el) return;
-  if(el.style.display==='none'){el.style.display='block';if(arrow)arrow.style.transform='rotate(180deg)';}
-  else{el.style.display='none';if(arrow)arrow.style.transform='';}
-}
-
-function addPriceEntry(svcName){
-  var svc=SERVICE_CATALOG[svcName];
-  if(!svc) return;
-  document.getElementById('emTitle').textContent='Add Price Entry';
-  document.getElementById('emSub').textContent=svcName;
-  var actypes=['Window Type','Split Type','Cassette/Mounted'];
-  document.getElementById('emBody').innerHTML='<div class="form-grid">'
-    +'<div class="field"><label>AC Type</label><select id="pe_actype"><option value="">— Any —</option>'+actypes.map(function(t){return '<option>'+t+'</option>';}).join('')+'</select></div>'
-    +'<div class="field"><label>HP</label><select id="pe_hp"><option value="">— Any —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select></div>'
-    +'<div class="field"><label>Inverter</label><select id="pe_inverter"><option value="">— Any —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>'
-    +'<div class="field"><label>Price (₱) *</label><input type="number" id="pe_price" min="0" step="0.01" placeholder="0.00"></div>'
-    +'</div>';
-  document.getElementById('emFoot').innerHTML=
-    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
-    +'<button class="btn btn-gold btn-sm" onclick="savePriceEntry(\''+svcName.replace(/'/g,"\\'")+'\')">💾 Add</button>';
-  openModal('editModal');
-}
-
-function savePriceEntry(svcName){
-  var price=parseFloat(document.getElementById('pe_price').value);
-  if(!price||price<=0){showToast('Enter a valid price','error');return;}
-  var svc=SERVICE_CATALOG[svcName];
-  if(!svc) return;
-  if(!svc.priceMatrix) svc.priceMatrix=[];
-  svc.priceMatrix.push({
-    actype:document.getElementById('pe_actype').value,
-    hp:document.getElementById('pe_hp').value,
-    inverter:document.getElementById('pe_inverter').value,
-    price:price
-  });
-  saveLocalData();
-  closeModal('editModal');
-  switchView('settings');
-  showToast('Price entry added!','success');
-}
-
-function editPriceEntry(svcName,idx){
-  var svc=SERVICE_CATALOG[svcName];
-  if(!svc||!svc.priceMatrix||!svc.priceMatrix[idx]) return;
-  var m=svc.priceMatrix[idx];
-  document.getElementById('emTitle').textContent='Edit Price Entry';
-  document.getElementById('emSub').textContent=svcName;
-  var actypes=['Window Type','Split Type','Cassette/Mounted'];
-  document.getElementById('emBody').innerHTML='<div class="form-grid">'
-    +'<div class="field"><label>AC Type</label><select id="pe_actype"><option value="">— Any —</option>'+actypes.map(function(t){return '<option'+(t===m.actype?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
-    +'<div class="field"><label>HP</label><select id="pe_hp"><option value="">— Any —</option>'+HP_OPTS.map(function(h){return '<option'+(h===m.hp?' selected':'')+'>'+h+'</option>';}).join('')+'</select></div>'
-    +'<div class="field"><label>Inverter</label><select id="pe_inverter"><option value="">— Any —</option><option value="Yes"'+(m.inverter==='Yes'?' selected':'')+'>Yes</option><option value="No"'+(m.inverter==='No'?' selected':'')+'>No</option></select></div>'
-    +'<div class="field"><label>Price (₱) *</label><input type="number" id="pe_price" min="0" step="0.01" value="'+m.price+'"></div>'
-    +'</div>';
-  document.getElementById('emFoot').innerHTML=
-    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
-    +'<button class="btn btn-gold btn-sm" onclick="saveEditedPriceEntry(\''+svcName.replace(/'/g,"\\'")+'\','+idx+')">💾 Save</button>';
-  openModal('editModal');
-}
-function saveEditedPriceEntry(svcName,idx){
-  var price=parseFloat(document.getElementById('pe_price').value);
-  if(!price||price<=0){showToast('Enter a valid price','error');return;}
-  var svc=SERVICE_CATALOG[svcName];
-  if(!svc||!svc.priceMatrix||!svc.priceMatrix[idx]) return;
-  svc.priceMatrix[idx]={
-    actype:document.getElementById('pe_actype').value,
-    hp:document.getElementById('pe_hp').value,
-    inverter:document.getElementById('pe_inverter').value,
-    price:price
-  };
-  saveLocalData();
-  closeModal('editModal');
-  switchView('settings');
-  showToast('Price entry updated!','success');
-}
-
-function removePriceEntry(svcName,idx){
-  confirm2('Remove Price Entry','Remove this price entry from the catalog?','🗑️',function(){
-    var svc=SERVICE_CATALOG[svcName];
-    if(!svc||!svc.priceMatrix) return;
-    svc.priceMatrix.splice(idx,1);
-    saveLocalData();
-    switchView('settings');
-    showToast('Price entry removed','success');
-  });
 }
 
 // Transportation Fee settings panel
@@ -13106,73 +12944,6 @@ function removeTranspoArea(area){
     switchView('settings');
     showToast('Area removed','success');
   });
-}
-
-function addNewCatalogService() {
-  document.getElementById('emTitle').textContent = 'Add New Service';
-  document.getElementById('emSub').textContent = 'Add to service catalog';
-  document.getElementById('emBody').innerHTML = '<div class="form-grid">'
-    +'<div class="field"><label>Service Name *</label><input id="cs_name" value="" placeholder="e.g. Aircon Repair"></div>'
-    +'<div class="field"><label>Category</label><select id="cs_cat">'
-    +'<option value="Aircon">Aircon</option><option value="Appliance">Appliance</option><option value="Electrical">Electrical</option><option value="Plumbing">Plumbing</option><option value="Other">Other</option>'
-    +'</select></div>'
-    +'<div class="field"><label>Base Price (₱) <span style="font-size:10px;color:var(--text-dim)">for services without matrix</span></label><input type="number" id="cs_price" value="" min="0" step="0.01" placeholder="0 = On-site pricing"></div>'
-    +'<div class="field form-full"><label>Description</label><textarea id="cs_desc" placeholder="Describe what this service includes..." style="min-height:60px"></textarea></div>'
-    +'<div class="field form-full"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cs_addToDropdown" checked style="width:18px;height:18px"> Also add to booking dropdown</label></div>'
-    +'</div>';
-  document.getElementById('emFoot').innerHTML =
-    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
-    +'<button class="btn btn-gold btn-sm" onclick="saveCatalogService(true)">💾 Add Service</button>';
-  openModal('editModal');
-}
-
-function editCatalogService(name) {
-  var s = SERVICE_CATALOG[name] || {name:name, category:'', basePrice:0, description:'', priceMatrix:[]};
-  document.getElementById('emTitle').textContent = 'Edit Service';
-  document.getElementById('emSub').textContent = name;
-  document.getElementById('emBody').innerHTML = '<div class="form-grid">'
-    +'<div class="field"><label>Service Name</label><input id="cs_name" value="'+s.name+'" readonly style="background:var(--bg-elev2)"></div>'
-    +'<div class="field"><label>Category</label><select id="cs_cat">'
-    +'<option value="Aircon"'+(s.category==='Aircon'?' selected':'')+'>Aircon</option>'
-    +'<option value="Appliance"'+(s.category==='Appliance'?' selected':'')+'>Appliance</option>'
-    +'<option value="Electrical"'+(s.category==='Electrical'?' selected':'')+'>Electrical</option>'
-    +'<option value="Plumbing"'+(s.category==='Plumbing'?' selected':'')+'>Plumbing</option>'
-    +'<option value="Other"'+(s.category==='Other'?' selected':'')+'>Other</option>'
-    +'</select></div>'
-    +'<div class="field"><label>Base Price (₱) <span style="font-size:10px;color:var(--text-dim)">fallback if no matrix match</span></label><input type="number" id="cs_price" value="'+(s.basePrice||'')+'" min="0" step="0.01" placeholder="0 = On-site pricing"></div>'
-    +'<div class="field form-full"><label>Description</label><textarea id="cs_desc" placeholder="Describe what this service includes..." style="min-height:60px">'+(s.description||'')+'</textarea></div>'
-    +'</div>';
-  document.getElementById('emFoot').innerHTML =
-    '<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Cancel</button> '
-    +'<button class="btn btn-gold btn-sm" onclick="saveCatalogService()">💾 Save</button>';
-  openModal('editModal');
-}
-
-function saveCatalogService(isNew) {
-  var name = document.getElementById('cs_name').value.trim();
-  if(!name){ showToast('Service name is required','error'); document.getElementById('cs_name').style.border='2px solid #dc2626'; return; }
-  var existing = SERVICE_CATALOG[name] || {};
-  SERVICE_CATALOG[name] = {
-    name: name,
-    category: document.getElementById('cs_cat').value,
-    basePrice: parseFloat(document.getElementById('cs_price').value)||0,
-    description: document.getElementById('cs_desc').value.trim(),
-    priceMatrix: existing.priceMatrix || []
-  };
-  // Add to SERVICES dropdown if checkbox is checked (new service)
-  if(isNew){
-    var addToDrop = document.getElementById('cs_addToDropdown');
-    if(addToDrop && addToDrop.checked && SERVICES.indexOf(name)===-1){
-      // Insert before 'Others'
-      var othersIdx = SERVICES.indexOf('Others');
-      if(othersIdx>=0) SERVICES.splice(othersIdx, 0, name);
-      else SERVICES.push(name);
-    }
-  }
-  saveLocalData();
-  closeModal('editModal');
-  switchView('settings');
-  showToast(isNew?'✅ New service added!':'Service catalog updated', 'success');
 }
 
 function renderAccountsManager(){

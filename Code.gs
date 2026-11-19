@@ -66,9 +66,6 @@ var HEADERS = {
   HouseholdBudgets: [
     'Category','Budget','Updated At'
   ],
-  ServiceCatalog: [
-    'Service Name','Category','Base Price','Description','Price Matrix JSON','Updated At'
-  ],
   TranspoFees: [
     'Area','Fee','Label','Updated At'
   ],
@@ -112,7 +109,6 @@ var SHEET_STYLES = {
   Payroll:       { bg: '#7f1d1d', fg: '#f59e0b' },
   InvestorShares:{ bg: '#064e3b', fg: '#f59e0b' },
   HouseholdBudgets:{ bg: '#065f46', fg: '#ffffff' },
-  ServiceCatalog:  { bg: '#0d1f3c', fg: '#f59e0b' },
   TranspoFees:     { bg: '#064e3b', fg: '#ffffff' },
   InventoryItems:  { bg: '#1e3a5f', fg: '#ffffff' },
   FeedbackLog:     { bg: '#065f46', fg: '#f59e0b' },
@@ -194,8 +190,6 @@ function doGet(e) {
         case 'deleteWaitlist':      result = deleteWaitlist(params);      break;
         case 'getHouseholdBudgets': result = getHouseholdBudgets();       break;
         case 'saveHouseholdBudget': result = saveHouseholdBudget(params); break;
-        case 'getServiceCatalog':  result = getServiceCatalog();        break;
-        case 'saveServiceCatalog': result = saveServiceCatalog(params); break;
         case 'getTranspoFees':     result = getTranspoFees();           break;
         case 'saveTranspoFees':    result = saveTranspoFeesAction(params); break;
         case 'getInventory':       result = getInventory();             break;
@@ -2165,46 +2159,6 @@ function ensureGenericSheet(sheetName) {
     }
   }
   return sheet;
-}
-
-/* ─── SERVICE CATALOG ────────────────────────────────────── */
-function getServiceCatalog() {
-  var sheet = ensureGenericSheet('ServiceCatalog');
-  var rows = sheet.getDataRange().getValues();
-  var catalog = {};
-  for (var i = 1; i < rows.length; i++) {
-    var name = String(rows[i][0]).trim();
-    if (!name) continue;
-    var matrix = [];
-    try { matrix = JSON.parse(rows[i][4] || '[]'); } catch(e) { matrix = []; }
-    catalog[name] = {
-      name: name,
-      category: rows[i][1] || '',
-      basePrice: parseFloat(rows[i][2]) || 0,
-      description: rows[i][3] || '',
-      priceMatrix: matrix
-    };
-  }
-  return { ok: true, catalog: catalog };
-}
-
-function saveServiceCatalog(p) {
-  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
-  var catalog = data.catalog;
-  if (!catalog) return { ok: false, error: 'No catalog data' };
-  var sheet = ensureGenericSheet('ServiceCatalog');
-  var ts = now();
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
-  var keys = Object.keys(catalog);
-  if (keys.length) {
-    var rows = keys.map(function(k) {
-      var s = catalog[k];
-      return [s.name || k, s.category || '', s.basePrice || 0, s.description || '', JSON.stringify(s.priceMatrix || []), ts];
-    });
-    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
-  }
-  return { ok: true, count: keys.length };
 }
 
 /* ─── TRANSPORTATION FEES ────────────────────────────────── */
