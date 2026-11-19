@@ -1577,7 +1577,7 @@ var DEFAULT_TRANSPO_FEES = {
 var TRANSPO_FEES = {};
 try { TRANSPO_FEES = JSON.parse(localStorage.getItem('djce_transpo_fees')||'{}'); } catch(e){ TRANSPO_FEES={}; }
 if(!Object.keys(TRANSPO_FEES).length) TRANSPO_FEES = JSON.parse(JSON.stringify(DEFAULT_TRANSPO_FEES));
-function saveTranspoFees(){ try{localStorage.setItem('djce_transpo_fees',JSON.stringify(TRANSPO_FEES));}catch(e){} }
+function saveTranspoFees(){ try{localStorage.setItem('djce_transpo_fees',JSON.stringify(TRANSPO_FEES));}catch(e){} syncTranspoFeesToSheets(); }
 
 // Lookup price from service catalog matrix
 function lookupServicePrice(serviceName, actype, hp, inverter){
@@ -7223,6 +7223,55 @@ function syncHouseholdBudgetsToSheets() {
     .catch(()=>{});
 }
 
+function syncServiceCatalogToSheets() {
+  callSheets({ action:'saveServiceCatalog', data:encodeURIComponent(JSON.stringify({ catalog: SERVICE_CATALOG })) })
+    .then(res=>{ if(res&&res.ok) console.log('Service catalog synced'); }).catch(()=>{});
+}
+function syncTranspoFeesToSheets() {
+  callSheets({ action:'saveTranspoFees', data:encodeURIComponent(JSON.stringify({ fees: TRANSPO_FEES })) })
+    .then(res=>{ if(res&&res.ok) console.log('Transpo fees synced'); }).catch(()=>{});
+}
+function syncInventoryToSheets() {
+  var items = INVENTORY.map(function(it){ return {'Item ID':it.id,'Name':it.name,'Category':it.category,'Qty':it.qty,'Unit':it.unit,'Min Stock':it.minStock,'Cost':it.cost,'Notes':it.notes,'Updated At':new Date().toISOString()}; });
+  callSheets({ action:'saveInventory', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Inventory synced'); }).catch(()=>{});
+}
+function syncFeedbackToSheets() {
+  var items = FEEDBACK.map(function(f){ return {'Feedback ID':f.id,'Booking ID':f.bookingId,'Client Name':f.clientName,'Rating':f.rating,'Comment':f.comment,'Date':f.date,'Created At':f.createdAt||''}; });
+  callSheets({ action:'saveFeedback', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Feedback synced'); }).catch(()=>{});
+}
+function syncWarrantyLogToSheets() {
+  var items = WARRANTY_LOG.map(function(w){ return {'Warranty ID':w.id,'Booking ID':w.bookingId,'Client Name':w.clientName,'Service':w.service,'Warranty Days':w.warrantyDays,'Start Date':w.startDate,'End Date':w.endDate,'Notes':w.notes,'Created At':w.createdAt||''}; });
+  callSheets({ action:'saveWarrantyLog', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Warranty log synced'); }).catch(()=>{});
+}
+function syncTimeCorrectionToSheets() {
+  var items = TIME_CORRECTIONS.map(function(t){ return {'Correction ID':t.id,'Booking ID':t.bookingId,'Field':t.field,'Old Value':t.oldVal,'New Value':t.newVal,'Reason':t.reason,'Edited By':t.editedBy,'Timestamp':t.timestamp}; });
+  callSheets({ action:'saveTimeCorrection', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Time corrections synced'); }).catch(()=>{});
+}
+function syncBlacklistToSheets() {
+  var items = BLACKLIST.map(function(b){ return {'Blacklist ID':b.id,'Client ID':b.clientId,'Client Name':b.clientName,'Phone':b.phone,'Reason':b.reason,'Blacklisted By':b.blacklistedBy,'Blacklisted At':b.blacklistedAt,'Status':b.status,'Lifted By':b.liftedBy||'','Lifted At':b.liftedAt||'','Lift Reason':b.liftReason||'','Notes':b.notes||''}; });
+  callSheets({ action:'saveBlacklist', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Blacklist synced'); }).catch(()=>{});
+}
+function syncActivityLogToSheets() {
+  var last50 = ACTIVITY_LOG.slice(-50);
+  var items = last50.map(function(a){ return {'Timestamp':a.ts||a.timestamp||'','User':a.user||'','Action':a.action||'','Type':a.type||'','Details':a.details||''}; });
+  callSheets({ action:'saveActivityLog', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Activity log synced'); }).catch(()=>{});
+}
+function syncCommLogToSheets() {
+  var items = COMM_LOG.map(function(c){ return {'Comm ID':c.id,'Booking ID':c.bookingId,'Client Name':c.clientName,'Type':c.type,'Direction':c.direction,'Summary':c.summary,'Date':c.date,'By':c.by,'Created At':c.createdAt||''}; });
+  callSheets({ action:'saveCommLog', data:encodeURIComponent(JSON.stringify({ items:items })) })
+    .then(res=>{ if(res&&res.ok) console.log('Comm log synced'); }).catch(()=>{});
+}
+function syncBookingPhotosToSheets() {
+  callSheets({ action:'saveBookingPhotos', data:encodeURIComponent(JSON.stringify({ photos: BOOKING_PHOTOS })) })
+    .then(res=>{ if(res&&res.ok) console.log('Booking photos synced'); }).catch(()=>{});
+}
+
 /* ─── Household Budget Tracker ─────────────────── */
 
 function buildHouseholdTracker(){
@@ -10818,6 +10867,7 @@ function renderArchive() {
 /* ===========================
    DATA PERSISTENCE
 =========================== */
+var _sheetSyncTimer = null;
 function saveLocalData() {
   localStorage.setItem('djce_bookings', JSON.stringify(BOOKINGS));
   localStorage.setItem('djce_clients', JSON.stringify(CLIENTS));
@@ -10834,6 +10884,19 @@ function saveLocalData() {
   localStorage.setItem('djce_time_corrections', JSON.stringify(TIME_CORRECTIONS));
   localStorage.setItem('djce_blacklist', JSON.stringify(BLACKLIST));
   localStorage.setItem('djce_waitlist', JSON.stringify(WAITLIST));
+  // Debounced sync to Google Sheets (waits 3s after last save to batch changes)
+  if (_sheetSyncTimer) clearTimeout(_sheetSyncTimer);
+  _sheetSyncTimer = setTimeout(function(){
+    syncServiceCatalogToSheets();
+    syncInventoryToSheets();
+    syncFeedbackToSheets();
+    syncWarrantyLogToSheets();
+    syncTimeCorrectionToSheets();
+    syncBlacklistToSheets();
+    syncActivityLogToSheets();
+    syncCommLogToSheets();
+    syncBookingPhotosToSheets();
+  }, 3000);
 }
 
 function loadLocalData() {
@@ -11116,6 +11179,89 @@ async function fetchFromSheets() {
         try { localStorage.setItem('djce_household_budgets', JSON.stringify(HOUSEHOLD_BUDGETS)); } catch(e){}
       }
     } catch(hbErr) { console.log('Household budgets sync skipped:', hbErr); }
+
+    // 9. Service Catalog
+    try {
+      const scData = await callSheets({ action: 'getServiceCatalog' });
+      if (scData && scData.ok && scData.catalog && Object.keys(scData.catalog).length) {
+        SERVICE_CATALOG = scData.catalog;
+        // Ensure defaults exist
+        Object.keys(DEFAULT_SERVICE_CATALOG).forEach(function(k){ if(!SERVICE_CATALOG[k]) SERVICE_CATALOG[k]=JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATALOG[k])); });
+      }
+    } catch(e) { console.log('Service catalog sync skipped:', e); }
+
+    // 10. Transportation Fees
+    try {
+      const tfData = await callSheets({ action: 'getTranspoFees' });
+      if (tfData && tfData.ok && tfData.fees && Object.keys(tfData.fees).length) {
+        TRANSPO_FEES = tfData.fees;
+        try { localStorage.setItem('djce_transpo_fees', JSON.stringify(TRANSPO_FEES)); } catch(e){}
+      }
+    } catch(e) { console.log('Transpo fees sync skipped:', e); }
+
+    // 11. Inventory
+    try {
+      const invData = await callSheets({ action: 'getInventory' });
+      if (invData && invData.ok && invData.items && invData.items.length) {
+        INVENTORY = invData.items.map(function(r){ return {id:r['Item ID'],name:r['Name'],category:r['Category'],qty:parseFloat(r['Qty'])||0,unit:r['Unit'],minStock:parseFloat(r['Min Stock'])||0,cost:parseFloat(r['Cost'])||0,notes:r['Notes']}; });
+      }
+    } catch(e) { console.log('Inventory sync skipped:', e); }
+
+    // 12. Feedback
+    try {
+      const fbData = await callSheets({ action: 'getFeedback' });
+      if (fbData && fbData.ok && fbData.items && fbData.items.length) {
+        FEEDBACK = fbData.items.map(function(r){ return {id:r['Feedback ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],rating:parseFloat(r['Rating'])||0,comment:r['Comment'],date:r['Date'],createdAt:r['Created At']}; });
+      }
+    } catch(e) { console.log('Feedback sync skipped:', e); }
+
+    // 13. Warranty Log
+    try {
+      const wlData2 = await callSheets({ action: 'getWarrantyLog' });
+      if (wlData2 && wlData2.ok && wlData2.items && wlData2.items.length) {
+        WARRANTY_LOG = wlData2.items.map(function(r){ return {id:r['Warranty ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],service:r['Service'],warrantyDays:parseInt(r['Warranty Days'])||0,startDate:r['Start Date'],endDate:r['End Date'],notes:r['Notes'],createdAt:r['Created At']}; });
+      }
+    } catch(e) { console.log('Warranty sync skipped:', e); }
+
+    // 14. Time Corrections
+    try {
+      const tcData = await callSheets({ action: 'getTimeCorrections' });
+      if (tcData && tcData.ok && tcData.items && tcData.items.length) {
+        TIME_CORRECTIONS = tcData.items.map(function(r){ return {id:r['Correction ID'],bookingId:r['Booking ID'],field:r['Field'],oldVal:r['Old Value'],newVal:r['New Value'],reason:r['Reason'],editedBy:r['Edited By'],timestamp:r['Timestamp']}; });
+      }
+    } catch(e) { console.log('Time corrections sync skipped:', e); }
+
+    // 15. Blacklist
+    try {
+      const blData = await callSheets({ action: 'getBlacklist' });
+      if (blData && blData.ok && blData.items && blData.items.length) {
+        BLACKLIST = blData.items.map(function(r){ return {id:r['Blacklist ID'],clientId:r['Client ID'],clientName:r['Client Name'],phone:r['Phone'],reason:r['Reason'],blacklistedBy:r['Blacklisted By'],blacklistedAt:r['Blacklisted At'],status:r['Status'],liftedBy:r['Lifted By'],liftedAt:r['Lifted At'],liftReason:r['Lift Reason'],notes:r['Notes']}; });
+      }
+    } catch(e) { console.log('Blacklist sync skipped:', e); }
+
+    // 16. Activity Log
+    try {
+      const alData = await callSheets({ action: 'getActivityLog' });
+      if (alData && alData.ok && alData.items && alData.items.length) {
+        ACTIVITY_LOG = alData.items.map(function(r){ return {ts:r['Timestamp'],user:r['User'],action:r['Action'],type:r['Type'],details:r['Details']}; });
+      }
+    } catch(e) { console.log('Activity log sync skipped:', e); }
+
+    // 17. Communication Log
+    try {
+      const clData = await callSheets({ action: 'getCommLog' });
+      if (clData && clData.ok && clData.items && clData.items.length) {
+        COMM_LOG = clData.items.map(function(r){ return {id:r['Comm ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],type:r['Type'],direction:r['Direction'],summary:r['Summary'],date:r['Date'],by:r['By'],createdAt:r['Created At']}; });
+      }
+    } catch(e) { console.log('Comm log sync skipped:', e); }
+
+    // 18. Booking Photos
+    try {
+      const bpData = await callSheets({ action: 'getBookingPhotos' });
+      if (bpData && bpData.ok && bpData.photos && Object.keys(bpData.photos).length) {
+        BOOKING_PHOTOS = bpData.photos;
+      }
+    } catch(e) { console.log('Booking photos sync skipped:', e); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';

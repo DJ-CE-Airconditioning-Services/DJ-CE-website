@@ -65,6 +65,36 @@ var HEADERS = {
   ],
   HouseholdBudgets: [
     'Category','Budget','Updated At'
+  ],
+  ServiceCatalog: [
+    'Service Name','Category','Base Price','Description','Price Matrix JSON','Updated At'
+  ],
+  TranspoFees: [
+    'Area','Fee','Label','Updated At'
+  ],
+  InventoryItems: [
+    'Item ID','Name','Category','Qty','Unit','Min Stock','Cost','Notes','Updated At'
+  ],
+  FeedbackLog: [
+    'Feedback ID','Booking ID','Client Name','Rating','Comment','Date','Created At'
+  ],
+  WarrantyLog: [
+    'Warranty ID','Booking ID','Client Name','Service','Warranty Days','Start Date','End Date','Notes','Created At'
+  ],
+  TimeCorrections: [
+    'Correction ID','Booking ID','Field','Old Value','New Value','Reason','Edited By','Timestamp'
+  ],
+  BlacklistLog: [
+    'Blacklist ID','Client ID','Client Name','Phone','Reason','Blacklisted By','Blacklisted At','Status','Lifted By','Lifted At','Lift Reason','Notes'
+  ],
+  ActivityLogSheet: [
+    'Timestamp','User','Action','Type','Details'
+  ],
+  CommLog: [
+    'Comm ID','Booking ID','Client Name','Type','Direction','Summary','Date','By','Created At'
+  ],
+  BookingPhotos: [
+    'Booking ID','Photos JSON','Updated At'
   ]
 };
 
@@ -81,7 +111,17 @@ var SHEET_STYLES = {
   DailyTracker:  { bg: '#1e3a5f', fg: '#ffffff' },
   Payroll:       { bg: '#7f1d1d', fg: '#f59e0b' },
   InvestorShares:{ bg: '#064e3b', fg: '#f59e0b' },
-  HouseholdBudgets:{ bg: '#065f46', fg: '#ffffff' }
+  HouseholdBudgets:{ bg: '#065f46', fg: '#ffffff' },
+  ServiceCatalog:  { bg: '#0d1f3c', fg: '#f59e0b' },
+  TranspoFees:     { bg: '#064e3b', fg: '#ffffff' },
+  InventoryItems:  { bg: '#1e3a5f', fg: '#ffffff' },
+  FeedbackLog:     { bg: '#065f46', fg: '#f59e0b' },
+  WarrantyLog:     { bg: '#7f1d1d', fg: '#ffffff' },
+  TimeCorrections: { bg: '#1e3a5f', fg: '#f59e0b' },
+  BlacklistLog:    { bg: '#7f1d1d', fg: '#f59e0b' },
+  ActivityLogSheet:{ bg: '#0d1f3c', fg: '#ffffff' },
+  CommLog:         { bg: '#065f46', fg: '#ffffff' },
+  BookingPhotos:   { bg: '#1e3a5f', fg: '#ffffff' }
 };
 
 /* ─── TIME SLOTS ──────────────────────────────────────────── */
@@ -154,6 +194,26 @@ function doGet(e) {
         case 'deleteWaitlist':      result = deleteWaitlist(params);      break;
         case 'getHouseholdBudgets': result = getHouseholdBudgets();       break;
         case 'saveHouseholdBudget': result = saveHouseholdBudget(params); break;
+        case 'getServiceCatalog':  result = getServiceCatalog();        break;
+        case 'saveServiceCatalog': result = saveServiceCatalog(params); break;
+        case 'getTranspoFees':     result = getTranspoFees();           break;
+        case 'saveTranspoFees':    result = saveTranspoFeesAction(params); break;
+        case 'getInventory':       result = getInventory();             break;
+        case 'saveInventory':      result = saveInventoryAction(params); break;
+        case 'getFeedback':        result = getFeedbackLog();           break;
+        case 'saveFeedback':       result = saveFeedbackAction(params); break;
+        case 'getWarrantyLog':     result = getWarrantyLog();           break;
+        case 'saveWarrantyLog':    result = saveWarrantyAction(params); break;
+        case 'getTimeCorrections': result = getTimeCorrections();       break;
+        case 'saveTimeCorrection': result = saveTimeCorrectionAction(params); break;
+        case 'getBlacklist':       result = getBlacklist();             break;
+        case 'saveBlacklist':      result = saveBlacklistAction(params); break;
+        case 'getActivityLog':     result = getActivityLogAction();     break;
+        case 'saveActivityLog':    result = saveActivityLogAction(params); break;
+        case 'getCommLog':         result = getCommLog();               break;
+        case 'saveCommLog':        result = saveCommLogAction(params);  break;
+        case 'getBookingPhotos':   result = getBookingPhotos();         break;
+        case 'saveBookingPhotos':  result = saveBookingPhotosAction(params); break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -2088,5 +2148,197 @@ function saveHouseholdBudget(p) {
   }
 
   return { ok: true, count: cats.length };
+}
+
+/* ─── GENERIC SHEET HELPER ───────────────────────────────── */
+function ensureGenericSheet(sheetName) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    var hdrs = HEADERS[sheetName];
+    if (hdrs) {
+      sheet.appendRow(hdrs);
+      var style = SHEET_STYLES[sheetName] || { bg: '#0d1f3c', fg: '#ffffff' };
+      sheet.getRange(1, 1, 1, hdrs.length).setFontWeight('bold').setBackground(style.bg).setFontColor(style.fg);
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
+
+/* ─── SERVICE CATALOG ────────────────────────────────────── */
+function getServiceCatalog() {
+  var sheet = ensureGenericSheet('ServiceCatalog');
+  var rows = sheet.getDataRange().getValues();
+  var catalog = {};
+  for (var i = 1; i < rows.length; i++) {
+    var name = String(rows[i][0]).trim();
+    if (!name) continue;
+    var matrix = [];
+    try { matrix = JSON.parse(rows[i][4] || '[]'); } catch(e) { matrix = []; }
+    catalog[name] = {
+      name: name,
+      category: rows[i][1] || '',
+      basePrice: parseFloat(rows[i][2]) || 0,
+      description: rows[i][3] || '',
+      priceMatrix: matrix
+    };
+  }
+  return { ok: true, catalog: catalog };
+}
+
+function saveServiceCatalog(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var catalog = data.catalog;
+  if (!catalog) return { ok: false, error: 'No catalog data' };
+  var sheet = ensureGenericSheet('ServiceCatalog');
+  var ts = now();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
+  var keys = Object.keys(catalog);
+  if (keys.length) {
+    var rows = keys.map(function(k) {
+      var s = catalog[k];
+      return [s.name || k, s.category || '', s.basePrice || 0, s.description || '', JSON.stringify(s.priceMatrix || []), ts];
+    });
+    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+  }
+  return { ok: true, count: keys.length };
+}
+
+/* ─── TRANSPORTATION FEES ────────────────────────────────── */
+function getTranspoFees() {
+  var sheet = ensureGenericSheet('TranspoFees');
+  var rows = sheet.getDataRange().getValues();
+  var fees = {};
+  for (var i = 1; i < rows.length; i++) {
+    var area = String(rows[i][0]).trim();
+    if (area) fees[area] = { fee: parseFloat(rows[i][1]) || 0, label: rows[i][2] || '' };
+  }
+  return { ok: true, fees: fees };
+}
+
+function saveTranspoFeesAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var fees = data.fees;
+  if (!fees) return { ok: false, error: 'No fees data' };
+  var sheet = ensureGenericSheet('TranspoFees');
+  var ts = now();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 4).clearContent();
+  var areas = Object.keys(fees);
+  if (areas.length) {
+    var rows = areas.map(function(a) { return [a, fees[a].fee || 0, fees[a].label || '', ts]; });
+    sheet.getRange(2, 1, rows.length, 4).setValues(rows);
+  }
+  return { ok: true, count: areas.length };
+}
+
+/* ─── ARRAY-BASED DATA (Inventory, Feedback, Warranty, TimeCorrections, Blacklist, ActivityLog, CommLog) ─── */
+function getArraySheet(sheetName, idKey) {
+  var sheet = ensureGenericSheet(sheetName);
+  var rows = sheet.getDataRange().getValues();
+  var hdrs = HEADERS[sheetName];
+  var items = [];
+  for (var i = 1; i < rows.length; i++) {
+    var obj = {};
+    for (var j = 0; j < hdrs.length; j++) {
+      obj[hdrs[j]] = rows[i][j] !== undefined ? rows[i][j] : '';
+    }
+    items.push(obj);
+  }
+  return { ok: true, items: items };
+}
+
+function saveArraySheet(sheetName, items) {
+  var sheet = ensureGenericSheet(sheetName);
+  var hdrs = HEADERS[sheetName];
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, hdrs.length).clearContent();
+  if (items.length) {
+    var rows = items.map(function(item) {
+      return hdrs.map(function(h) { return item[h] !== undefined ? item[h] : ''; });
+    });
+    sheet.getRange(2, 1, rows.length, hdrs.length).setValues(rows);
+  }
+  return { ok: true, count: items.length };
+}
+
+/* ─── INVENTORY ──────────────────────────────────────────── */
+function getInventory() { return getArraySheet('InventoryItems'); }
+function saveInventoryAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('InventoryItems', data.items || []);
+}
+
+/* ─── FEEDBACK ───────────────────────────────────────────── */
+function getFeedbackLog() { return getArraySheet('FeedbackLog'); }
+function saveFeedbackAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('FeedbackLog', data.items || []);
+}
+
+/* ─── WARRANTY LOG ───────────────────────────────────────── */
+function getWarrantyLog() { return getArraySheet('WarrantyLog'); }
+function saveWarrantyAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('WarrantyLog', data.items || []);
+}
+
+/* ─── TIME CORRECTIONS ───────────────────────────────────── */
+function getTimeCorrections() { return getArraySheet('TimeCorrections'); }
+function saveTimeCorrectionAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('TimeCorrections', data.items || []);
+}
+
+/* ─── BLACKLIST ──────────────────────────────────────────── */
+function getBlacklist() { return getArraySheet('BlacklistLog'); }
+function saveBlacklistAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('BlacklistLog', data.items || []);
+}
+
+/* ─── ACTIVITY LOG ───────────────────────────────────────── */
+function getActivityLogAction() { return getArraySheet('ActivityLogSheet'); }
+function saveActivityLogAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('ActivityLogSheet', data.items || []);
+}
+
+/* ─── COMMUNICATION LOG ──────────────────────────────────── */
+function getCommLog() { return getArraySheet('CommLog'); }
+function saveCommLogAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  return saveArraySheet('CommLog', data.items || []);
+}
+
+/* ─── BOOKING PHOTOS ─────────────────────────────────────── */
+function getBookingPhotos() {
+  var sheet = ensureGenericSheet('BookingPhotos');
+  var rows = sheet.getDataRange().getValues();
+  var photos = {};
+  for (var i = 1; i < rows.length; i++) {
+    var bid = String(rows[i][0]).trim();
+    if (!bid) continue;
+    try { photos[bid] = JSON.parse(rows[i][1] || '[]'); } catch(e) { photos[bid] = []; }
+  }
+  return { ok: true, photos: photos };
+}
+
+function saveBookingPhotosAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var photos = data.photos || {};
+  var sheet = ensureGenericSheet('BookingPhotos');
+  var ts = now();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  var bids = Object.keys(photos);
+  if (bids.length) {
+    var rows = bids.map(function(bid) { return [bid, JSON.stringify(photos[bid] || []), ts]; });
+    sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  }
+  return { ok: true, count: bids.length };
 }
 
