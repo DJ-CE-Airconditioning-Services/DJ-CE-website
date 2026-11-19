@@ -12170,7 +12170,7 @@ function openClientModal(key){
     '<div class="sec-divider" style="margin-top:14px">Booking History ('+bks.length+')</div>'+
     (bks.length ? '<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Service</th><th>Date</th><th>Status</th><th>Amount</th></tr></thead><tbody>'+
     bks.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(b=>
-      '<tr><td style="font-family:monospace;font-size:10.5px;color:var(--accent)">'+b.id+'</td>'+
+      '<tr style="cursor:pointer" onclick="closeModal(\'clientModal\');openBookingDetail(\''+b.id+'\')"><td style="font-family:monospace;font-size:10.5px;color:var(--accent)">'+b.id+'</td>'+
       '<td style="font-size:12px">'+b.service+'</td><td>'+formatDate(b.date)+'</td>'+
       '<td><span class="status-badge s-'+(b.status||'pending').toLowerCase()+'">'+b.status+'</span></td>'+
       '<td>'+(b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—')+'</td></tr>'
