@@ -1378,7 +1378,12 @@ const UNIT_ILLUSTRATIONS = {
 };
 const DJCE_BIZ = {name:'DJ-CE Air-conditioning Services',dti:'Business Name No. 5947985',bir:'TIN: ____________',address:'87 Purok 2, Iba O Este, Calumpit, Bulacan',phone:'0967 004 2636',email:'djceservicesforyou@gmail.com',fb:'DJ-CE Air-conditioning Services',tagline:'We serve with quality and care!'};
 var SERVICES = ['Aircon Cleaning','Aircon Installation','Aircon Relocation','Aircon Dismantle','Freon Charging','Aircon Bracket','AWM Deep Cleaning','Breaker Installation','Electrical Work','Troubleshoot','Plumbing','Others'];
-function refreshServicesList(){ SERVICES = Object.keys(SERVICE_CATALOG); }
+function refreshServicesList(){
+  // Use DEFAULT as base, then add any custom services from catalog
+  var defaults = Object.keys(DEFAULT_SERVICE_CATALOG);
+  var custom = Object.keys(SERVICE_CATALOG).filter(function(k){ return defaults.indexOf(k)===-1; });
+  SERVICES = defaults.concat(custom);
+}
 var SERVICE_AREAS = JSON.parse(localStorage.getItem('djce_service_areas')||'null') || ['Calumpit','Malolos','Balagtas','Guiguinto','Bocaue','Pulilan','Plaridel','San Miguel','Apalit','Sto. Tomas','Angeles','San Fernando'];
 function saveServiceAreas(){ localStorage.setItem('djce_service_areas', JSON.stringify(SERVICE_AREAS)); }
 const SERVICE_TIERS = [
@@ -10696,6 +10701,17 @@ function loadLocalData() {
   try { BOOKING_PHOTOS = JSON.parse(localStorage.getItem('djce_photos')||'{}'); } catch(e) { BOOKING_PHOTOS={}; }
   try { SERVICE_CATALOG = JSON.parse(localStorage.getItem('djce_service_catalog')||'{}'); } catch(e) { SERVICE_CATALOG={}; }
   if (!Object.keys(SERVICE_CATALOG).length) SERVICE_CATALOG = JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATALOG));
+  // Migrate: remove old split service names, ensure defaults exist
+  var oldSplits=['Aircon Cleaning – Window Type','Aircon Cleaning – Split Type','Aircon Cleaning – Mounted/Cassette',
+    'Aircon Cleaning - Window Type','Aircon Cleaning - Split Type','Aircon Cleaning - Mounted/Cassette',
+    'AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works'];
+  var migrated=false;
+  oldSplits.forEach(function(old){ if(SERVICE_CATALOG[old]){ delete SERVICE_CATALOG[old]; migrated=true; }});
+  // Ensure all default services exist
+  Object.keys(DEFAULT_SERVICE_CATALOG).forEach(function(k){
+    if(!SERVICE_CATALOG[k]){ SERVICE_CATALOG[k]=JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATALOG[k])); migrated=true; }
+  });
+  if(migrated) try{localStorage.setItem('djce_service_catalog',JSON.stringify(SERVICE_CATALOG));}catch(e){}
   refreshServicesList();
   try { COMM_LOG = JSON.parse(localStorage.getItem('djce_comm_log')||'[]'); } catch(e) { COMM_LOG=[]; }
   try { INVENTORY = JSON.parse(localStorage.getItem('djce_inventory')||'[]'); } catch(e) { INVENTORY=[]; }
