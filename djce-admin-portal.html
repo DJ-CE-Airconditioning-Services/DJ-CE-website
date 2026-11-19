@@ -3011,9 +3011,9 @@ function buildSvcDetailFields(idx, svc){
     +'<input id="'+p+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
   var fl='<select id="'+p+'floor"><option value="">— Floor —</option>'+FLOOR_OPTS.map(function(f){return '<option>'+f+'</option>';}).join('')+'</select>';
 
-  var inv='<select id="'+p+'inverter" onchange="autoFillPrice('+idx+')"><option value="">—</option><option value="Yes">Yes (Inverter)</option><option value="No">No (Non-Inverter)</option></select>';
-  var actypeWithAuto='<select id="'+p+'actype" onchange="autoFillPrice('+idx+')"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
-  var hpWithAuto='<select id="'+p+'hp" onchange="autoFillPrice('+idx+')"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
+  var inv='<select id="'+p+'inverter"><option value="">—</option><option value="Yes">Yes (Inverter)</option><option value="No">No (Non-Inverter)</option></select>';
+  var actypeWithAuto='<select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
+  var hpWithAuto='<select id="'+p+'hp"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
 
   if(svc==='Aircon Cleaning'){
     return '<div class="form-grid" style="margin-top:6px">'+
@@ -3023,7 +3023,6 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
-      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
       '<div class="field"><label>Next Cleaning</label><input type="date" id="'+p+'nextdate" min="'+new Date().toISOString().split('T')[0]+'" onchange="showMonthsAway(this,\''+p+'nextlbl\')" style="width:100%"></div>'+
       '<div class="field"><label>&nbsp;</label><span id="'+p+'nextlbl" style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap;background:var(--card);border-radius:8px;padding:10px 14px;display:none"></span></div>'+
     '</div>';
@@ -3036,7 +3035,6 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
-      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc.includes('AWM Deep Clean')){
@@ -3061,7 +3059,6 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Floor</label>'+fl+'</div>'+
       amtField+
-      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc==='Freon Charging'){
@@ -3072,7 +3069,6 @@ function buildSvcDetailFields(idx, svc){
       '<div class="field"><label>Brand</label>'+bac+'</div>'+
       '<div class="field"><label>Refrigerant</label><select id="'+p+'refrig"><option value="">—</option><option>R22</option><option>R32</option><option>R410A</option></select></div>'+
       amtField+
-      '<div class="field form-full" id="'+p+'priceHint" style="display:none"><span style="font-size:11px;padding:4px 10px;background:var(--accent-soft);color:var(--accent);border-radius:6px;font-weight:600">💡 Matrix price auto-filled</span></div>'+
     '</div>';
   }
   if(svc==='Aircon Bracket'){
@@ -3087,8 +3083,8 @@ function buildSvcDetailFields(idx, svc){
   }
   if(svc==='Troubleshoot'){
     var tsApplianceOpts='<option value="">— Select —</option><option>Aircon</option><option>AWM (Washing Machine)</option><option>Electrical</option><option>Appliance</option><option>Other</option>';
-    var actypeSel='<select id="'+p+'actype" onchange="autoFillPrice('+idx+')"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
-    var hpSel='<select id="'+p+'hp" onchange="autoFillPrice('+idx+')"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
+    var actypeSel='<select id="'+p+'actype"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
+    var hpSel='<select id="'+p+'hp"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
     var acPfx=p+'ac_';
     var wmPfx=p+'wm_';
     var tsAcBrand='<select id="'+acPfx+'brand" onchange="toggleOtherBrand(\''+acPfx+'\')"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
@@ -3356,21 +3352,17 @@ async function saveBooking() {
       if(!earliestNext||e.nextdate<earliestNext) earliestNext=e.nextdate;
     }
   });
-  // Auto-compute service fee from price matrix
+  // Sum manually entered service amounts
   var totalServiceFee = 0;
   validSvc.forEach(function(e){
     var amt = parseFloat(e.amount)||0;
     if(amt) totalServiceFee += amt;
-    else {
-      var matrixPrice = lookupServicePrice(e.service, e.actype, e.hp, e.inverter);
-      if(matrixPrice) totalServiceFee += matrixPrice;
-    }
   });
-  // Auto-compute transpo fee from address
+  // Transpo fee from address (for reference only)
   var transpoResult = lookupTranspoFee(address);
   var transpoFee = transpoResult.fee || 0;
   var manualAmount = document.getElementById('nb_amount')?.value||'';
-  var totalAmount = manualAmount || (totalServiceFee + transpoFee) || '';
+  var totalAmount = manualAmount || '';
 
   BOOKINGS[id] = {
     id, refNo, name, phone,
