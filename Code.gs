@@ -92,6 +92,9 @@ var HEADERS = {
   ],
   BookingPhotos: [
     'Booking ID','Photos JSON','Updated At'
+  ],
+  CalendarNotes: [
+    'Date','Note','Category','Created By','Created At','Updated At'
   ]
 };
 
@@ -117,7 +120,8 @@ var SHEET_STYLES = {
   BlacklistLog:    { bg: '#7f1d1d', fg: '#f59e0b' },
   ActivityLogSheet:{ bg: '#0d1f3c', fg: '#ffffff' },
   CommLog:         { bg: '#065f46', fg: '#ffffff' },
-  BookingPhotos:   { bg: '#1e3a5f', fg: '#ffffff' }
+  BookingPhotos:   { bg: '#1e3a5f', fg: '#ffffff' },
+  CalendarNotes:   { bg: '#064e3b', fg: '#f59e0b' }
 };
 
 /* ─── TIME SLOTS ──────────────────────────────────────────── */
@@ -208,6 +212,8 @@ function doGet(e) {
         case 'saveCommLog':        result = saveCommLogAction(params);  break;
         case 'getBookingPhotos':   result = getBookingPhotos();         break;
         case 'saveBookingPhotos':  result = saveBookingPhotosAction(params); break;
+        case 'getCalendarNotes':   result = getCalendarNotes();         break;
+        case 'saveCalendarNotes':  result = saveCalendarNotesAction(params); break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -2294,5 +2300,42 @@ function saveBookingPhotosAction(p) {
     sheet.getRange(2, 1, rows.length, 3).setValues(rows);
   }
   return { ok: true, count: bids.length };
+}
+
+/* ─── CALENDAR NOTES ────────────────────────────────────── */
+function getCalendarNotes() {
+  var sheet = ensureGenericSheet('CalendarNotes');
+  var rows = sheet.getDataRange().getValues();
+  var notes = {};
+  for (var i = 1; i < rows.length; i++) {
+    var date = String(rows[i][0]).trim();
+    if (!date) continue;
+    notes[date] = {
+      note: String(rows[i][1] || ''),
+      category: String(rows[i][2] || ''),
+      createdBy: String(rows[i][3] || ''),
+      createdAt: String(rows[i][4] || ''),
+      updatedAt: String(rows[i][5] || '')
+    };
+  }
+  return { ok: true, notes: notes };
+}
+
+function saveCalendarNotesAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var notes = data.notes || {};
+  var sheet = ensureGenericSheet('CalendarNotes');
+  var ts = now();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
+  var dates = Object.keys(notes);
+  if (dates.length) {
+    var rows = dates.map(function(d) {
+      var n = notes[d];
+      return [d, n.note || '', n.category || '', n.createdBy || '', n.createdAt || '', ts];
+    });
+    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+  }
+  return { ok: true, count: dates.length };
 }
 

@@ -918,6 +918,7 @@ tr:hover td { background:var(--bg-elev2); }
     <div id="view-archive" class="view"></div>
     <div id="view-accounting" class="view"></div>
     <div id="view-unitsales" class="view"></div>
+    <div id="view-notes" class="view"></div>
   </div>
 </div>
 </div>
@@ -1422,6 +1423,7 @@ var PERMISSION_SECTIONS = [
   {key:'trash',       label:'🗑️ Trash',                group:'System'},
   {key:'archive',     label:'📦 Archive',              group:'System'},
   {key:'activity',    label:'📜 Activity Log',         group:'System'},
+  {key:'notes',       label:'📝 Calendar Notes',        group:'System'},
   {key:'settings',    label:'⚙️ Settings & Account',   group:'System'}
 ];
 
@@ -1619,6 +1621,7 @@ function lookupTranspoFee(address){
 let BOOKING_PHOTOS = {};
 let SCHEDULE_SLOTS = []; // { slotId, date, timeSlot, label, time, maxBookings, currentBookings, remaining, status }
 let WAITLIST = []; // { id, name, phone, email, address, barangay, city, service, preferredDate, preferredTime, notes, status, source, createdAt }
+let CALENDAR_NOTES = {}; // { '2026-11-19': { note:'text', category:'revenue', createdBy:'divine', createdAt:'...', updatedAt:'...' } }
 
 // Accounting module data (local, saved to localStorage)
 let ACCT_EMPLOYEES = []; // { id, name, role, type:'fixed'|'commission'|'oncall'|'investor', dailyRate, mealAllowance, accountUsername, notes, bankName, accountNo, accountName }
@@ -1972,6 +1975,7 @@ function buildNav() {
 
   // System — always show
   h += '<div class="nav-sec">System</div>';
+  h += ni('notes','📝','Calendar Notes');
   h += ni('activity','📜','Activity Log');
   h += ni('settings','⚙️','Settings & Account');
   h += ni('trash','🗑️','Trash',trashBadge);
@@ -2021,7 +2025,8 @@ function updatePageTitle(name) {
     activity:'Activity Log', 'my-jobs':'My Assigned Jobs', settings:'Settings & Account',
     trash:'🗑️ Trash', archive:'📦 Archive', followup:'Follow-up Center', logistics:'Route / Logistics', accounting:'Accounting', unitsales:'Unit Sales',
     'mama-commissions':'My Commissions',
-    'investor-dashboard':'Investor Dashboard'
+    'investor-dashboard':'Investor Dashboard',
+    notes:'Calendar Notes'
   };
   document.getElementById('pageTitle').textContent = titles[name] || name;
 }
@@ -2048,6 +2053,7 @@ function renderView(name) {
     case 'mama-commissions': return renderMamaCommissions();
     case 'investor-dashboard': return renderInvestorDashboard();
     case 'logistics': return renderLogistics();
+    case 'notes': return renderCalendarNotes();
     default: return '<div class="empty"><div class="empty-ic">🚧</div>Coming soon</div>';
   }
 }
@@ -7267,6 +7273,188 @@ function syncBookingPhotosToSheets() {
   callSheets({ action:'saveBookingPhotos', data:encodeURIComponent(JSON.stringify({ photos: BOOKING_PHOTOS })) })
     .then(res=>{ if(res&&res.ok) console.log('Booking photos synced'); }).catch(()=>{});
 }
+function syncCalendarNotesToSheets() {
+  callSheets({ action:'saveCalendarNotes', data:encodeURIComponent(JSON.stringify({ notes: CALENDAR_NOTES })) })
+    .then(res=>{ if(res&&res.ok) console.log('Calendar notes synced'); }).catch(()=>{});
+}
+
+/* ─── Calendar Notes ─────────────────────────────── */
+var _calNotesMonth = null;
+var _calNotesYear = null;
+var _calSelectedDate = null;
+
+function renderCalendarNotes() {
+  var now = new Date();
+  if (!_calNotesMonth) _calNotesMonth = now.getMonth();
+  if (!_calNotesYear) _calNotesYear = now.getFullYear();
+  if (!_calSelectedDate) _calSelectedDate = now.toISOString().split('T')[0];
+
+  var todayStr = now.toISOString().split('T')[0];
+  var totalNotes = Object.keys(CALENDAR_NOTES).length;
+
+  var html = '<div style="max-width:900px;margin:0 auto">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  html += '<div style="font-size:16px;font-weight:800">📝 Calendar Notes</div>';
+  html += '<div style="font-size:12px;color:var(--text-dim)">'+totalNotes+' note'+(totalNotes!==1?'s':'')+' saved</div>';
+  html += '</div>';
+
+  // Calendar + side panel layout
+  html += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+
+  // LEFT: Calendar
+  html += '<div style="flex:1;min-width:280px">';
+  html += buildNotesCalendar(_calNotesYear, _calNotesMonth, todayStr);
+  html += '</div>';
+
+  // RIGHT: Note panel for selected date
+  html += '<div style="flex:1;min-width:280px">';
+  html += buildNotePanel(_calSelectedDate);
+  html += '</div>';
+
+  html += '</div>'; // end flex
+  html += '</div>'; // end max-width wrapper
+  return html;
+}
+
+function buildNotesCalendar(year, month, todayStr) {
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var firstDay = new Date(year, month, 1).getDay();
+  var daysInMonth = new Date(year, month+1, 0).getDate();
+
+  var h = '<div class="panel" style="padding:12px">';
+  // Month nav
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+  h += '<button class="btn btn-outline btn-sm" onclick="calNotesNav(-1)" style="padding:4px 10px">◀</button>';
+  h += '<div style="font-size:15px;font-weight:800">'+monthNames[month]+' '+year+'</div>';
+  h += '<button class="btn btn-outline btn-sm" onclick="calNotesNav(1)" style="padding:4px 10px">▶</button>';
+  h += '</div>';
+
+  // Day headers
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;margin-bottom:4px">';
+  dayNames.forEach(function(d){ h += '<div style="font-size:10px;font-weight:700;color:var(--muted);padding:4px 0">'+d+'</div>'; });
+  h += '</div>';
+
+  // Day cells
+  h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center">';
+  // Empty cells before first day
+  for (var e=0;e<firstDay;e++) h += '<div></div>';
+
+  for (var d=1;d<=daysInMonth;d++) {
+    var dateStr = year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isToday2 = dateStr === todayStr;
+    var isSelected = dateStr === _calSelectedDate;
+    var hasNote = CALENDAR_NOTES[dateStr] && CALENDAR_NOTES[dateStr].note;
+    var bg = isSelected ? 'var(--accent)' : isToday2 ? 'var(--info)' : hasNote ? 'var(--success-soft)' : 'var(--bg-elev2)';
+    var fg = (isSelected||isToday2) ? '#fff' : hasNote ? 'var(--success)' : 'var(--text)';
+    var border = isToday2 && !isSelected ? '2px solid var(--info)' : 'none';
+    var dot = hasNote && !isSelected ? '<div style="width:5px;height:5px;border-radius:50%;background:var(--success);margin:1px auto 0"></div>' : '';
+    var cellId = 'calCell'+d;
+    h += '<div id="'+cellId+'" onclick="calNotesSelectDate(\''+dateStr+'\')" style="cursor:pointer;padding:6px 2px;border-radius:8px;background:'+bg+';color:'+fg+';font-size:12px;font-weight:'+(isSelected||isToday2?'800':'600')+';border:'+border+';transition:all .15s">'+d+dot+'</div>';
+  }
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function buildNotePanel(dateStr) {
+  var d = new Date(dateStr+'T00:00:00');
+  var dayLabel = d.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  var note = CALENDAR_NOTES[dateStr] || {};
+  var hasNote = note.note && note.note.trim();
+  var cat = note.category || 'general';
+
+  var h = '<div class="panel" style="padding:16px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+  h += '<div style="font-size:14px;font-weight:800">📅 '+dayLabel+'</div>';
+  if (hasNote) {
+    h += '<button class="btn btn-outline btn-sm" onclick="deleteCalNote(\''+dateStr+'\')" style="padding:3px 8px;font-size:11px;color:var(--danger)">🗑️ Delete</button>';
+  }
+  h += '</div>';
+
+  // Category selector
+  h += '<div style="margin-bottom:10px">';
+  h += '<label style="font-size:11px;font-weight:700;color:var(--text-dim);display:block;margin-bottom:4px">Category</label>';
+  h += '<select id="calNoteCategory" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);font-size:13px">';
+  var cats = [
+    {v:'general',l:'📋 General'},
+    {v:'revenue',l:'💰 Revenue'},
+    {v:'todo',l:'✅ To Do'},
+    {v:'reminder',l:'🔔 Reminder'},
+    {v:'issue',l:'⚠️ Issue'},
+    {v:'meeting',l:'🤝 Meeting'}
+  ];
+  cats.forEach(function(c){
+    h += '<option value="'+c.v+'"'+(cat===c.v?' selected':'')+'>'+c.l+'</option>';
+  });
+  h += '</select>';
+  h += '</div>';
+
+  // Note textarea
+  h += '<div style="margin-bottom:12px">';
+  h += '<label style="font-size:11px;font-weight:700;color:var(--text-dim);display:block;margin-bottom:4px">Notes</label>';
+  h += '<textarea id="calNoteText" rows="6" placeholder="Write your notes for this day..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5">'+(note.note||'').replace(/</g,'&lt;')+'</textarea>';
+  h += '</div>';
+
+  // Save button
+  h += '<button class="btn btn-gold" onclick="saveCalNote(\''+dateStr+'\')" style="width:100%;padding:10px;font-size:13px;font-weight:700">💾 Save Note</button>';
+
+  // Show metadata if exists
+  if (hasNote && note.updatedAt) {
+    h += '<div style="margin-top:8px;font-size:10px;color:var(--muted);text-align:center">Last updated: '+(note.updatedAt||note.createdAt||'')+'</div>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function calNotesNav(dir) {
+  _calNotesMonth += dir;
+  if (_calNotesMonth > 11) { _calNotesMonth = 0; _calNotesYear++; }
+  if (_calNotesMonth < 0) { _calNotesMonth = 11; _calNotesYear--; }
+  var view = document.getElementById('view-notes');
+  if (view) view.innerHTML = renderCalendarNotes();
+}
+
+function calNotesSelectDate(dateStr) {
+  _calSelectedDate = dateStr;
+  var view = document.getElementById('view-notes');
+  if (view) view.innerHTML = renderCalendarNotes();
+}
+
+function saveCalNote(dateStr) {
+  var text = document.getElementById('calNoteText').value.trim();
+  var cat = document.getElementById('calNoteCategory').value;
+  if (!text) {
+    showToast('Walang laman ang note','warning');
+    return;
+  }
+  var now2 = new Date().toISOString();
+  var existing = CALENDAR_NOTES[dateStr];
+  CALENDAR_NOTES[dateStr] = {
+    note: text,
+    category: cat,
+    createdBy: session ? session.username : 'admin',
+    createdAt: existing && existing.createdAt ? existing.createdAt : now2,
+    updatedAt: now2
+  };
+  saveLocalData();
+  logActivity('📝', 'Saved note for '+dateStr+' ['+cat+']', 'notes');
+  showToast('Note saved for '+dateStr+' ✅','success');
+  var view = document.getElementById('view-notes');
+  if (view) view.innerHTML = renderCalendarNotes();
+}
+
+function deleteCalNote(dateStr) {
+  confirm2('Delete Note','Are you sure you want to delete the note for '+dateStr+'?','🗑️',function(){
+    delete CALENDAR_NOTES[dateStr];
+    saveLocalData();
+    logActivity('🗑️', 'Deleted note for '+dateStr, 'notes');
+    showToast('Note deleted','info');
+    var view = document.getElementById('view-notes');
+    if (view) view.innerHTML = renderCalendarNotes();
+  });
+}
 
 /* ─── Household Budget Tracker ─────────────────── */
 
@@ -10879,6 +11067,7 @@ function saveLocalData() {
   localStorage.setItem('djce_time_corrections', JSON.stringify(TIME_CORRECTIONS));
   localStorage.setItem('djce_blacklist', JSON.stringify(BLACKLIST));
   localStorage.setItem('djce_waitlist', JSON.stringify(WAITLIST));
+  localStorage.setItem('djce_calendar_notes', JSON.stringify(CALENDAR_NOTES));
   // Debounced sync to Google Sheets (waits 3s after last save to batch changes)
   if (_sheetSyncTimer) clearTimeout(_sheetSyncTimer);
   _sheetSyncTimer = setTimeout(function(){
@@ -10890,6 +11079,7 @@ function saveLocalData() {
     syncActivityLogToSheets();
     syncCommLogToSheets();
     syncBookingPhotosToSheets();
+    syncCalendarNotesToSheets();
   }, 3000);
 }
 
@@ -10922,6 +11112,7 @@ function loadLocalData() {
   try { TIME_CORRECTIONS = JSON.parse(localStorage.getItem('djce_time_corrections')||'[]'); } catch(e) { TIME_CORRECTIONS=[]; }
   try { BLACKLIST = JSON.parse(localStorage.getItem('djce_blacklist')||'[]'); } catch(e) { BLACKLIST=[]; }
   try { WAITLIST = JSON.parse(localStorage.getItem('djce_waitlist')||'[]'); } catch(e) { WAITLIST=[]; }
+  try { CALENDAR_NOTES = JSON.parse(localStorage.getItem('djce_calendar_notes')||'{}'); } catch(e) { CALENDAR_NOTES={}; }
   autoPurgeTrash();
 }
 
@@ -11246,6 +11437,15 @@ async function fetchFromSheets() {
         BOOKING_PHOTOS = bpData.photos;
       }
     } catch(e) { console.log('Booking photos sync skipped:', e); }
+
+    // 19. Calendar Notes
+    try {
+      const cnData = await callSheets({ action: 'getCalendarNotes' });
+      if (cnData && cnData.ok && cnData.notes && Object.keys(cnData.notes).length) {
+        CALENDAR_NOTES = cnData.notes;
+        try { localStorage.setItem('djce_calendar_notes', JSON.stringify(CALENDAR_NOTES)); } catch(e){}
+      }
+    } catch(e) { console.log('Calendar notes sync skipped:', e); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';
