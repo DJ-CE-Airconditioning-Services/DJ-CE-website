@@ -2558,6 +2558,24 @@ function openBookingDetail(id) {
       </div>
       <div><div class="sec-divider">Service Details</div>
         <div class="info-row"><span class="info-label">Service</span><span class="info-val"><strong>${b.service||'—'}</strong></span></div>
+        ${(function(){
+          if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length) return b.serviceDetailsSummary?'<div class="info-row"><span class="info-label">Details</span><span class="info-val" style="font-size:12px;color:var(--text-dim)">'+b.serviceDetailsSummary+'</span></div>':'';
+          return b.serviceDetails.serviceEntries.map(function(e,i){
+            var parts=[];
+            if(e.applianceType) parts.push('<strong>'+e.applianceType+'</strong>');
+            if(e.actype) parts.push(e.actype);
+            if(e.hp) parts.push(e.hp);
+            if(e.inverter==='Yes') parts.push('Inverter');
+            if(e.inverter==='No') parts.push('Non-Inverter');
+            if(e.brand) parts.push(e.brand);
+            if(e.wmcap) parts.push(e.wmcap);
+            if(e.floor) parts.push(e.floor);
+            if(e.issue) parts.push('<em>'+e.issue.substring(0,80)+'</em>');
+            if(e.amount) parts.push('₱'+parseFloat(e.amount).toLocaleString());
+            if(!parts.length) return '';
+            return '<div class="info-row"><span class="info-label">Unit '+(b.serviceDetails.serviceEntries.length>1?(i+1):'Info')+'</span><span class="info-val" style="font-size:12px">'+parts.join(' · ')+'</span></div>';
+          }).join('');
+        })()}
         <div class="info-row"><span class="info-label">Tier</span><span class="info-val">${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">🔴 Rush</span>':'<span style="color:var(--success);font-size:12px">🟢 Normal</span>'}</span></div>
         ${b.contactPerson?'<div class="info-row"><span class="info-label">Contact @ Site</span><span class="info-val"><strong>'+b.contactPerson+'</strong>'+(b.contactPhone?' · '+b.contactPhone:'')+'</span></div>':''}
         <div class="info-row"><span class="info-label">Date</span><span class="info-val">${formatDate(b.date)}</span></div>
@@ -2678,6 +2696,50 @@ function openBookingDetail(id) {
         </select>
       </div>
     </div>
+    ${(function(){
+      if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length) return '';
+      return '<div class="sec-divider" style="margin-top:12px">🔧 Edit Unit Details</div>'
+        +b.serviceDetails.serviceEntries.map(function(e,i){
+          var pf='detSvc'+i+'_';
+          var svc=e.service||b.service||'';
+          var isAC=svc.includes('Aircon')||(e.applianceType==='Aircon');
+          var isAWM=svc.includes('AWM')||(e.applianceType&&e.applianceType.includes('AWM'));
+          var isTS=svc==='Troubleshoot';
+          var rows='<div class="form-grid">';
+          if(isTS){
+            rows+='<div class="field"><label>Appliance Type</label><select id="'+pf+'applianceType">'
+              +'<option value="">— Select —</option>'
+              +['Aircon','AWM (Washing Machine)','Electrical','Appliance','Other'].map(function(o){return '<option'+(e.applianceType===o?' selected':'')+'>'+o+'</option>';}).join('')
+              +'</select></div>';
+          }
+          if(isAC||isTS){
+            rows+='<div class="field"><label>AC Type</label><select id="'+pf+'actype"><option value="">—</option>'
+              +['Split Type','Window Type','Cassette/Mounted'].map(function(o){return '<option'+(e.actype===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>';
+            rows+='<div class="field"><label>HP</label><select id="'+pf+'hp"><option value="">— HP —</option>'
+              +HP_OPTS.map(function(o){return '<option'+(e.hp===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>';
+            rows+='<div class="field"><label>Inverter</label><select id="'+pf+'inverter"><option value="">—</option>'
+              +'<option value="Yes"'+(e.inverter==='Yes'?' selected':'')+'>Yes</option><option value="No"'+(e.inverter==='No'?' selected':'')+'>No</option></select></div>';
+          }
+          rows+='<div class="field"><label>Brand</label><input id="'+pf+'brand" value="'+escH(e.brand||'')+'" placeholder="Brand"></div>';
+          if(isAWM){
+            rows+='<div class="field"><label>Type</label><select id="'+pf+'actype"><option value="">—</option>'
+              +'<option'+(e.actype==='Top Load'?' selected':'')+'>Top Load</option><option'+(e.actype==='Front Load'?' selected':'')+'>Front Load</option></select></div>';
+            rows+='<div class="field"><label>Capacity (KG)</label><select id="'+pf+'wmcap"><option value="">— KG —</option>'
+              +WM_CAP.map(function(o){return '<option'+(e.wmcap===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>';
+          }
+          if(e.floor!==undefined){
+            rows+='<div class="field"><label>Floor</label><input id="'+pf+'floor" value="'+escH(e.floor||'')+'" placeholder="e.g. 2nd floor"></div>';
+          }
+          if(isTS){
+            rows+='<div class="field form-full"><label>Issue</label><input id="'+pf+'issue" value="'+escH(e.issue||'')+'" placeholder="Describe the issue"></div>';
+          }
+          rows+='<div class="field"><label>Amount (₱)</label><input type="number" id="'+pf+'amount" value="'+(e.amount||'')+'" min="0" step="0.01" placeholder="0.00"></div>';
+          rows+='</div>';
+          return '<div style="background:var(--bg-elev2);border-radius:10px;padding:14px;border:1px solid var(--border);margin-bottom:8px">'
+            +'<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">'+svc+(b.serviceDetails.serviceEntries.length>1?' #'+(i+1):'')+'</div>'
+            +rows+'</div>';
+        }).join('');
+    })()}
     <div class="sec-divider" style="margin-top:12px">📅 Reschedule</div>
     <div style="background:var(--bg-elev2);border-radius:10px;padding:14px;border:1px solid var(--border);margin-bottom:12px">
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">Set a new date/time and notify the client via email</div>
@@ -2880,6 +2942,34 @@ function updateBooking(id) {
   b.oncallHelper= oncallHelper || undefined;
   b.feeDiscount = feeDiscount || undefined;
   b.amount      = amount > 0 ? String(amount) : (b.amount||'');
+  // Update service detail entries if they exist
+  if(b.serviceDetails&&b.serviceDetails.serviceEntries&&b.serviceDetails.serviceEntries.length){
+    var summaryParts=[];
+    b.serviceDetails.serviceEntries.forEach(function(e,i){
+      var pf='detSvc'+i+'_';
+      var v=function(fid){return document.getElementById(pf+fid)?.value||'';};
+      if(v('applianceType')) e.applianceType=v('applianceType');
+      if(v('actype')) e.actype=v('actype');
+      if(v('hp')) e.hp=v('hp');
+      if(v('inverter')) e.inverter=v('inverter');
+      if(v('brand')) e.brand=v('brand');
+      if(v('wmcap')) e.wmcap=v('wmcap');
+      if(v('floor')) e.floor=v('floor');
+      if(v('issue')) e.issue=v('issue');
+      if(v('amount')) e.amount=v('amount');
+      var pts=[e.service||b.service||''];
+      if(e.applianceType)pts.push(e.applianceType);
+      if(e.actype)pts.push(e.actype);
+      if(e.hp)pts.push(e.hp);
+      if(e.inverter==='Yes')pts.push('Inverter');
+      if(e.brand)pts.push(e.brand);
+      if(e.wmcap)pts.push(e.wmcap);
+      if(e.floor)pts.push(e.floor);
+      if(e.amount)pts.push('₱'+parseFloat(e.amount).toLocaleString());
+      summaryParts.push(pts.join(' · '));
+    });
+    b.serviceDetailsSummary=summaryParts.join(' | ');
+  }
   b._dirty = true;
   saveLocalData();
   syncBookingToSheets(b);
