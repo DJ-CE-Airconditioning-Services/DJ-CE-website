@@ -2697,7 +2697,15 @@ function openBookingDetail(id) {
       </div>
     </div>
     ${(function(){
-      if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length) return '';
+      // If no serviceEntries, create one from the booking's top-level fields so we can edit
+      if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length){
+        var svcType=b.service||'';
+        // Detect if this service type needs unit detail fields
+        var needsFields=svcType.includes('Aircon')||svcType.includes('AWM')||svcType==='Troubleshoot'||svcType==='Freon Charging';
+        if(!needsFields) return '';
+        // Create a temporary entry from whatever top-level data exists
+        b.serviceDetails={serviceEntries:[{service:svcType,actype:b.actype||'',hp:b.hp||'',inverter:b.inverter||'',brand:b.brand||'',wmcap:b.wmcap||'',floor:b.floor||'',issue:b.issue||'',amount:b.amount||'',applianceType:b.applianceType||''}]};
+      }
       return '<div class="sec-divider" style="margin-top:12px">🔧 Edit Unit Details</div>'
         +b.serviceDetails.serviceEntries.map(function(e,i){
           var pf='detSvc'+i+'_';
