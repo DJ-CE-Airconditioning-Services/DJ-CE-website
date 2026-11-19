@@ -3040,10 +3040,12 @@ function buildSvcDetailFields(idx, svc){
     '</div>';
   }
   if(svc.includes('AWM Deep Clean')){
+    var wmType='<select id="'+p+'actype"><option value="">— Type —</option><option>Top Load</option><option>Front Load</option></select>';
     var wmBrands='<select id="'+p+'brand" onchange="toggleOtherBrand(\''+p+'\')"><option value="">— Brand —</option>'+WM_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
       +'<input id="'+p+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
     var wmCap='<select id="'+p+'wmcap"><option value="">— KG —</option>'+WM_CAP.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>';
     return '<div class="form-grid" style="margin-top:6px">'+
+      '<div class="field"><label>Type</label>'+wmType+'</div>'+
       '<div class="field"><label>Brand</label>'+wmBrands+'</div>'+
       '<div class="field"><label>Capacity</label>'+wmCap+'</div>'+
       amtField+
