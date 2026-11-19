@@ -1379,10 +1379,13 @@ const UNIT_ILLUSTRATIONS = {
 const DJCE_BIZ = {name:'DJ-CE Air-conditioning Services',dti:'Business Name No. 5947985',bir:'TIN: ____________',address:'87 Purok 2, Iba O Este, Calumpit, Bulacan',phone:'0967 004 2636',email:'djceservicesforyou@gmail.com',fb:'DJ-CE Air-conditioning Services',tagline:'We serve with quality and care!'};
 var SERVICES = ['Aircon Cleaning','Aircon Installation','Aircon Relocation','Aircon Dismantle','Freon Charging','Aircon Bracket','AWM Deep Cleaning','Breaker Installation','Electrical Work','Troubleshoot','Plumbing','Others'];
 function refreshServicesList(){
-  // Use DEFAULT as base, then add any custom services from catalog
-  var defaults = Object.keys(DEFAULT_SERVICE_CATALOG);
-  var custom = Object.keys(SERVICE_CATALOG).filter(function(k){ return defaults.indexOf(k)===-1; });
-  SERVICES = defaults.concat(custom);
+  // Canonical order from defaults, then any custom services user added
+  var base = ['Aircon Cleaning','Aircon Installation','Aircon Relocation','Aircon Dismantle','Freon Charging','Aircon Bracket','AWM Deep Cleaning','Breaker Installation','Electrical Work','Troubleshoot','Plumbing','Others'];
+  var custom = Object.keys(SERVICE_CATALOG).filter(function(k){ return base.indexOf(k)===-1; });
+  // Filter out old split names
+  var oldNames=['Aircon Cleaning – Window Type','Aircon Cleaning – Split Type','Aircon Cleaning – Mounted/Cassette','Aircon Cleaning - Window Type','Aircon Cleaning - Split Type','Aircon Cleaning - Mounted/Cassette','AWM Deep Clean (Top Load)','AWM Deep Clean (Front Load)','Electrical Works'];
+  custom = custom.filter(function(k){ return oldNames.indexOf(k)===-1; });
+  SERVICES = base.concat(custom);
 }
 var SERVICE_AREAS = JSON.parse(localStorage.getItem('djce_service_areas')||'null') || ['Calumpit','Malolos','Balagtas','Guiguinto','Bocaue','Pulilan','Plaridel','San Miguel','Apalit','Sto. Tomas','Angeles','San Fernando'];
 function saveServiceAreas(){ localStorage.setItem('djce_service_areas', JSON.stringify(SERVICE_AREAS)); }
