@@ -3074,15 +3074,35 @@ function buildSvcDetailFields(idx, svc){
     return '<div style="margin-top:6px"><div class="field"><label>Details</label><textarea id="'+p+'issue" placeholder="e.g. 30A breaker, additional circuit, etc." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
   }
   if(svc==='Troubleshoot'){
-    return '<div style="margin-top:6px"><div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. Hindi lumalamig, may tunog, may tulo, etc." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
+    var tsApplianceOpts='<option value="">— Select —</option><option>Aircon</option><option>AWM (Washing Machine)</option><option>Electrical</option><option>Appliance</option><option>Other</option>';
+    var actypeSel='<select id="'+p+'actype" onchange="autoFillPrice('+idx+')"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
+    var hpSel='<select id="'+p+'hp" onchange="autoFillPrice('+idx+')"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
+    return '<div style="margin-top:6px"><div class="form-grid">'
+      +'<div class="field"><label>Appliance Type</label><select id="'+p+'applianceType" onchange="toggleTsFields('+idx+')">'+tsApplianceOpts+'</select></div>'
+      +'<div class="field"><label>Brand</label><input id="'+p+'brand" placeholder="e.g. Carrier, Samsung"></div>'
+      +'</div>'
+      +'<div id="'+p+'tsUnitFields" style="display:none"><div class="form-grid">'
+      +'<div class="field"><label>AC Type</label>'+actypeSel+'</div>'
+      +'<div class="field"><label>HP</label>'+hpSel+'</div>'
+      +'<div class="field"><label>Inverter</label><select id="'+p+'inverter"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select></div>'
+      +'</div></div>'
+      +'<div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. Hindi lumalamig, may tunog, may tulo, error code E2, etc." style="min-height:60px"></textarea></div>'
+      +'<div class="form-grid">'+amtField+'</div></div>';
   }
-  if(svc==='Electrical Works'||svc==='Plumbing'){
+  if(svc==='Electrical Works'||svc==='Electrical Work'||svc==='Plumbing'){
     return '<div style="margin-top:6px"><div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. No power sa isang room, leaking pipe, etc." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
   }
   if(svc==='Others'){
     return '<div style="margin-top:6px"><div class="field"><label>Describe the service needed *</label><textarea id="'+p+'issue" placeholder="Describe what service is needed..." style="min-height:60px"></textarea></div><div class="form-grid">'+amtField+'</div></div>';
   }
   return '';
+}
+
+function toggleTsFields(idx){
+  var p='svc_'+idx+'_';
+  var appType=document.getElementById(p+'applianceType')?.value||'';
+  var unitFields=document.getElementById(p+'tsUnitFields');
+  if(unitFields) unitFields.style.display=(appType==='Aircon')?'block':'none';
 }
 
 function getServiceDetails() {
@@ -3093,9 +3113,10 @@ function getServiceDetails() {
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
     var item={service:svc, brand:pick('brand'), hp:pick('hp'), actype:pick('actype'),
-      inverter:pick('inverter'), floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount')};
+      inverter:pick('inverter'), floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount'), applianceType:pick('applianceType')};
     entries.push(item);
     var pts=[svc];
+    if(item.applianceType)pts.push(item.applianceType);
     if(item.actype)pts.push(item.actype);
     if(item.hp)pts.push(item.hp);
     if(item.inverter==='Yes')pts.push('Inverter');
