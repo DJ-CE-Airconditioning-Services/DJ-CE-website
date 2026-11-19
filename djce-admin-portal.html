@@ -3087,14 +3087,28 @@ function buildSvcDetailFields(idx, svc){
     var tsApplianceOpts='<option value="">— Select —</option><option>Aircon</option><option>AWM (Washing Machine)</option><option>Electrical</option><option>Appliance</option><option>Other</option>';
     var actypeSel='<select id="'+p+'actype" onchange="autoFillPrice('+idx+')"><option value="">—</option><option>Split Type</option><option>Window Type</option><option>Cassette/Mounted</option></select>';
     var hpSel='<select id="'+p+'hp" onchange="autoFillPrice('+idx+')"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
+    var acPfx=p+'ac_';
+    var wmPfx=p+'wm_';
+    var tsAcBrand='<select id="'+acPfx+'brand" onchange="toggleOtherBrand(\''+acPfx+'\')"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
+      +'<input id="'+acPfx+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
+    var tsWmBrand='<select id="'+wmPfx+'brand" onchange="toggleOtherBrand(\''+wmPfx+'\')"><option value="">— Brand —</option>'+WM_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
+      +'<input id="'+wmPfx+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
+    var tsWmCap='<select id="'+wmPfx+'cap"><option value="">— KG —</option>'+WM_CAP.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>';
     return '<div style="margin-top:6px"><div class="form-grid">'
-      +'<div class="field"><label>Appliance Type</label><select id="'+p+'applianceType" onchange="toggleTsFields('+idx+')">'+tsApplianceOpts+'</select></div>'
-      +'<div class="field"><label>Brand</label><input id="'+p+'brand" placeholder="e.g. Carrier, Samsung"></div>'
+      +'<div class="field"><label>Appliance Type *</label><select id="'+p+'applianceType" onchange="toggleTsFields('+idx+')">'+tsApplianceOpts+'</select></div>'
       +'</div>'
-      +'<div id="'+p+'tsUnitFields" style="display:none"><div class="form-grid">'
+      +'<div id="'+p+'tsAcFields" style="display:none"><div class="form-grid">'
       +'<div class="field"><label>AC Type</label>'+actypeSel+'</div>'
       +'<div class="field"><label>HP</label>'+hpSel+'</div>'
       +'<div class="field"><label>Inverter</label><select id="'+p+'inverter"><option value="">—</option><option value="Yes">Yes</option><option value="No">No</option></select></div>'
+      +'<div class="field"><label>Brand</label>'+tsAcBrand+'</div>'
+      +'</div></div>'
+      +'<div id="'+p+'tsAwmFields" style="display:none"><div class="form-grid">'
+      +'<div class="field"><label>Brand</label>'+tsWmBrand+'</div>'
+      +'<div class="field"><label>Capacity (KG)</label>'+tsWmCap+'</div>'
+      +'</div></div>'
+      +'<div id="'+p+'tsOtherFields" style="display:none"><div class="form-grid">'
+      +'<div class="field"><label>Brand / Unit</label><input id="'+p+'otherBrand" placeholder="e.g. Samsung, Panasonic"></div>'
       +'</div></div>'
       +'<div class="field"><label>Describe the issue *</label><textarea id="'+p+'issue" placeholder="e.g. Hindi lumalamig, may tunog, may tulo, error code E2, etc." style="min-height:60px"></textarea></div>'
       +'<div class="form-grid">'+amtField+'</div></div>';
@@ -3117,8 +3131,12 @@ function toggleOtherBrand(prefix){
 function toggleTsFields(idx){
   var p='svc_'+idx+'_';
   var appType=document.getElementById(p+'applianceType')?.value||'';
-  var unitFields=document.getElementById(p+'tsUnitFields');
-  if(unitFields) unitFields.style.display=(appType==='Aircon')?'block':'none';
+  var acFields=document.getElementById(p+'tsAcFields');
+  var awmFields=document.getElementById(p+'tsAwmFields');
+  var otherFields=document.getElementById(p+'tsOtherFields');
+  if(acFields) acFields.style.display=(appType==='Aircon')?'block':'none';
+  if(awmFields) awmFields.style.display=(appType==='AWM (Washing Machine)')?'block':'none';
+  if(otherFields) otherFields.style.display=(appType==='Electrical'||appType==='Appliance'||appType==='Other')?'block':'none';
 }
 
 function getServiceDetails() {
@@ -3128,10 +3146,26 @@ function getServiceDetails() {
     var p='svc_'+i+'_';
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
-    var brandVal=pick('brand');
-    if(brandVal==='Other') brandVal=pick('brandOther')||'Other';
+    var brandVal='';
+    var appT=pick('applianceType');
+    var wmcapVal=pick('wmcap');
+    if(svc==='Troubleshoot'){
+      if(appT==='Aircon'){
+        brandVal=document.getElementById(p+'ac_brand')?.value||'';
+        if(brandVal==='Other') brandVal=document.getElementById(p+'ac_brandOther')?.value||'Other';
+      } else if(appT==='AWM (Washing Machine)'){
+        brandVal=document.getElementById(p+'wm_brand')?.value||'';
+        if(brandVal==='Other') brandVal=document.getElementById(p+'wm_brandOther')?.value||'Other';
+        wmcapVal=document.getElementById(p+'wm_cap')?.value||'';
+      } else {
+        brandVal=document.getElementById(p+'otherBrand')?.value||'';
+      }
+    } else {
+      brandVal=pick('brand');
+      if(brandVal==='Other') brandVal=pick('brandOther')||'Other';
+    }
     var item={service:svc, brand:brandVal, hp:pick('hp'), actype:pick('actype'),
-      inverter:pick('inverter'), floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount'), applianceType:pick('applianceType')};
+      inverter:pick('inverter'), floor:pick('floor'), wmcap:wmcapVal, issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount'), applianceType:appT};
     entries.push(item);
     var pts=[svc];
     if(item.applianceType)pts.push(item.applianceType);
