@@ -3007,7 +3007,8 @@ function buildSvcDetailFields(idx, svc){
   var p='svc_'+idx+'_';
   var amtField='<div class="field"><label>Amount (₱)</label><input type="number" id="'+p+'amount" placeholder="0.00" min="0" step="0.01" style="width:100%"></div>';
   var hp='<select id="'+p+'hp"><option value="">— HP —</option>'+HP_OPTS.map(function(h){return '<option>'+h+'</option>';}).join('')+'</select>';
-  var bac='<select id="'+p+'brand"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>';
+  var bac='<select id="'+p+'brand" onchange="toggleOtherBrand(\''+p+'\')"><option value="">— Brand —</option>'+AC_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
+    +'<input id="'+p+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
   var fl='<select id="'+p+'floor"><option value="">— Floor —</option>'+FLOOR_OPTS.map(function(f){return '<option>'+f+'</option>';}).join('')+'</select>';
 
   var inv='<select id="'+p+'inverter" onchange="autoFillPrice('+idx+')"><option value="">—</option><option value="Yes">Yes (Inverter)</option><option value="No">No (Non-Inverter)</option></select>';
@@ -3039,7 +3040,8 @@ function buildSvcDetailFields(idx, svc){
     '</div>';
   }
   if(svc.includes('AWM Deep Clean')){
-    var wmBrands='<select id="'+p+'brand"><option value="">— Brand —</option>'+WM_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>';
+    var wmBrands='<select id="'+p+'brand" onchange="toggleOtherBrand(\''+p+'\')"><option value="">— Brand —</option>'+WM_BRANDS.map(function(b){return '<option>'+b+'</option>';}).join('')+'</select>'
+      +'<input id="'+p+'brandOther" type="text" placeholder="Specify brand..." style="display:none;margin-top:4px">';
     var wmCap='<select id="'+p+'wmcap"><option value="">— KG —</option>'+WM_CAP.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>';
     return '<div class="form-grid" style="margin-top:6px">'+
       '<div class="field"><label>Brand</label>'+wmBrands+'</div>'+
@@ -3106,6 +3108,12 @@ function buildSvcDetailFields(idx, svc){
   return '';
 }
 
+function toggleOtherBrand(prefix){
+  var sel=document.getElementById(prefix+'brand');
+  var other=document.getElementById(prefix+'brandOther');
+  if(sel&&other) other.style.display=(sel.value==='Other')?'block':'none';
+}
+
 function toggleTsFields(idx){
   var p='svc_'+idx+'_';
   var appType=document.getElementById(p+'applianceType')?.value||'';
@@ -3120,7 +3128,9 @@ function getServiceDetails() {
     var p='svc_'+i+'_';
     var pick=function(id){return document.getElementById(p+id)?.value||'';};
     var svc=document.getElementById('svc_type_'+i)?.value||'';
-    var item={service:svc, brand:pick('brand'), hp:pick('hp'), actype:pick('actype'),
+    var brandVal=pick('brand');
+    if(brandVal==='Other') brandVal=pick('brandOther')||'Other';
+    var item={service:svc, brand:brandVal, hp:pick('hp'), actype:pick('actype'),
       inverter:pick('inverter'), floor:pick('floor'), wmcap:pick('wmcap'), issue:pick('issue'), nextdate:pick('nextdate'), amount:pick('amount'), applianceType:pick('applianceType')};
     entries.push(item);
     var pts=[svc];
