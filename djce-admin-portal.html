@@ -1358,7 +1358,7 @@ try { HOUSEHOLD_BUDGETS = JSON.parse(localStorage.getItem('djce_household_budget
 if(!HOUSEHOLD_BUDGETS || !Object.keys(HOUSEHOLD_BUDGETS).length){
   HOUSEHOLD_BUDGETS = { 'Food': 18000, 'Utilities': 5000, 'Transportation': 3000, 'Other': 2000 };
 }
-function saveHouseholdBudgets(){ try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){} }
+function saveHouseholdBudgets(){ try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){} syncHouseholdBudgetsToSheets(); }
 function getHouseholdCategories(){ return Object.keys(HOUSEHOLD_BUDGETS); }
 const TEAM_RATES = {
   'Papa (Senior Tech)': { type: 'senior', label: 'Senior Tech', dailyRate: 0, food: 0, otRate: 0, note: 'Family — flexible' },
@@ -7217,6 +7217,12 @@ function syncExpenseToSheets(e) {
     .catch(()=>{});
 }
 
+function syncHouseholdBudgetsToSheets() {
+  callSheets({ action:'saveHouseholdBudget', data:encodeURIComponent(JSON.stringify({ budgets: HOUSEHOLD_BUDGETS })) })
+    .then(res=>{ if(res&&res.ok) console.log('Household budgets synced to Sheets'); })
+    .catch(()=>{});
+}
+
 /* ─── Household Budget Tracker ─────────────────── */
 
 function buildHouseholdTracker(){
@@ -11101,6 +11107,15 @@ async function fetchFromSheets() {
         WAITLIST = wlData.waitlist.filter(w => w.status !== 'Converted' && w.status !== 'Removed');
       }
     } catch(wlErr) { console.log('Waitlist sync skipped:', wlErr); }
+
+    // 8. Household Budgets
+    try {
+      const hbData = await callSheets({ action: 'getHouseholdBudgets' });
+      if (hbData && hbData.ok && hbData.budgets && Object.keys(hbData.budgets).length) {
+        HOUSEHOLD_BUDGETS = hbData.budgets;
+        try { localStorage.setItem('djce_household_budgets', JSON.stringify(HOUSEHOLD_BUDGETS)); } catch(e){}
+      }
+    } catch(hbErr) { console.log('Household budgets sync skipped:', hbErr); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';

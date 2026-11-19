@@ -62,6 +62,9 @@ var HEADERS = {
   ],
   InvestorShares: [
     'Record ID','Investor Name','Share Percent','Year','Month','Monthly Ipon','Notes','Created At'
+  ],
+  HouseholdBudgets: [
+    'Category','Budget','Updated At'
   ]
 };
 
@@ -77,7 +80,8 @@ var SHEET_STYLES = {
   Employees:     { bg: '#065f46', fg: '#f59e0b' },
   DailyTracker:  { bg: '#1e3a5f', fg: '#ffffff' },
   Payroll:       { bg: '#7f1d1d', fg: '#f59e0b' },
-  InvestorShares:{ bg: '#064e3b', fg: '#f59e0b' }
+  InvestorShares:{ bg: '#064e3b', fg: '#f59e0b' },
+  HouseholdBudgets:{ bg: '#065f46', fg: '#ffffff' }
 };
 
 /* ─── TIME SLOTS ──────────────────────────────────────────── */
@@ -148,6 +152,8 @@ function doGet(e) {
         case 'getWaitlist':         result = getWaitlist(params);         break;
         case 'updateWaitlist':      result = updateWaitlist(params);      break;
         case 'deleteWaitlist':      result = deleteWaitlist(params);      break;
+        case 'getHouseholdBudgets': result = getHouseholdBudgets();       break;
+        case 'saveHouseholdBudget': result = saveHouseholdBudget(params); break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -2028,5 +2034,59 @@ function deleteWaitlist(p) {
     }
   }
   return { ok: false, error: 'Not found' };
+}
+
+/* ─── HOUSEHOLD BUDGETS ──────────────────────────────────── */
+function ensureHouseholdBudgetsSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('HouseholdBudgets');
+  if (!sheet) {
+    sheet = ss.insertSheet('HouseholdBudgets');
+    var hdrs = HEADERS.HouseholdBudgets;
+    sheet.appendRow(hdrs);
+    var style = SHEET_STYLES.HouseholdBudgets || { bg: '#065f46', fg: '#ffffff' };
+    sheet.getRange(1, 1, 1, hdrs.length).setFontWeight('bold').setBackground(style.bg).setFontColor(style.fg);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getHouseholdBudgets() {
+  var sheet = ensureHouseholdBudgetsSheet();
+  var rows = sheet.getDataRange().getValues();
+  var budgets = {};
+  for (var i = 1; i < rows.length; i++) {
+    var cat = String(rows[i][0]).trim();
+    if (cat) budgets[cat] = parseFloat(rows[i][1]) || 0;
+  }
+  return { ok: true, budgets: budgets };
+}
+
+function saveHouseholdBudget(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var budgets = data.budgets; // { "Food": 18000, "Utilities": 5000, ... }
+  if (!budgets || typeof budgets !== 'object') {
+    return { ok: false, error: 'No budgets data provided' };
+  }
+
+  var sheet = ensureHouseholdBudgetsSheet();
+  var ts = now();
+
+  // Clear existing data (keep header)
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  }
+
+  // Write all categories
+  var cats = Object.keys(budgets);
+  if (cats.length > 0) {
+    var newData = cats.map(function(cat) {
+      return [cat, budgets[cat], ts];
+    });
+    sheet.getRange(2, 1, newData.length, 3).setValues(newData);
+  }
+
+  return { ok: true, count: cats.length };
 }
 
