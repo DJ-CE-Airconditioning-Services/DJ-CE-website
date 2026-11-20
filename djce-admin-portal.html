@@ -2579,7 +2579,11 @@ function openBookingDetail(id) {
             if(e.issue) parts.push('<em>'+e.issue.substring(0,80)+'</em>');
             if(e.amount) parts.push('₱'+parseFloat(e.amount).toLocaleString());
             if(!parts.length) return '';
-            return '<div class="info-row"><span class="info-label">Unit '+(b.serviceDetails.serviceEntries.length>1?(i+1):'Info')+'</span><span class="info-val" style="font-size:12px">'+parts.join(' · ')+'</span></div>';
+            var confirmBadge='';
+            if(b.status==='Done' && b.serviceDetails.serviceEntries.length>1){
+              confirmBadge=e.confirmed?'<span style="background:#d4edda;color:#155724;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px">✅ Done</span>':'<span style="background:#f8d7da;color:#842029;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px">⏭️ Skipped</span>';
+            }
+            return '<div class="info-row"><span class="info-label">Unit '+(b.serviceDetails.serviceEntries.length>1?(i+1):'Info')+'</span><span class="info-val" style="font-size:12px">'+parts.join(' · ')+confirmBadge+'</span></div>';
           }).join('');
         })()}
         <div class="info-row"><span class="info-label">Tier</span><span class="info-val">${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">🔴 Rush</span>':'<span style="color:var(--success);font-size:12px">🟢 Normal</span>'}</span></div>
@@ -3007,6 +3011,16 @@ function updateBooking(id) {
 function markDone(id) {
   const b = BOOKINGS[id];
   if (!b) return;
+  // If booking has multiple service entries, show unit confirmation modal
+  var entries = (b.serviceDetails && b.serviceDetails.serviceEntries) ? b.serviceDetails.serviceEntries : [];
+  if (entries.length > 1) {
+    openUnitConfirmModal(id);
+    return;
+  }
+  // Single entry or no entries — mark done directly
+  if (entries.length === 1) {
+    entries[0].confirmed = true;
+  }
   b.status = 'Done';
   b.completedAt = new Date().toISOString();
   b._dirty = true;
@@ -3016,6 +3030,127 @@ function markDone(id) {
   closeModal('bookingModal');
   showToast('Job marked as Done! Great work! 💪', 'success');
   switchView('my-jobs');
+}
+
+function openUnitConfirmModal(bookingId) {
+  var b = BOOKINGS[bookingId];
+  if (!b) return;
+  var entries = b.serviceDetails.serviceEntries;
+  var h = '<div style="margin-bottom:14px;font-size:13px;color:var(--text-dim)">Piliin kung anong units ang na-service ngayon. Yung mga checked lang ang macocompute sa total amount.</div>';
+  h += '<div id="ucUnits">';
+  entries.forEach(function(e, i) {
+    var parts = [];
+    if (e.service) parts.push('<strong>' + escH(e.service) + '</strong>');
+    if (e.applianceType) parts.push(escH(e.applianceType));
+    if (e.actype) parts.push(escH(e.actype));
+    if (e.hp) parts.push(escH(e.hp));
+    if (e.inverter === 'Yes') parts.push('Inverter');
+    if (e.inverter === 'No') parts.push('Non-Inverter');
+    if (e.brand) parts.push(escH(e.brand));
+    if (e.wmcap) parts.push(escH(e.wmcap));
+    if (e.floor) parts.push(escH(e.floor));
+    var amt = parseFloat(e.amount) || 0;
+    h += '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer">';
+    h += '<input type="checkbox" id="uc_unit_' + i + '" checked onchange="calcUnitConfirmTotal(\'' + bookingId + '\')" style="margin-top:3px;width:18px;height:18px;accent-color:var(--accent);flex-shrink:0">';
+    h += '<div style="flex:1"><div style="font-size:13px">' + parts.join(' · ') + '</div>';
+    if (e.issue) h += '<div style="font-size:11px;color:var(--text-dim);margin-top:2px"><em>' + escH(e.issue.substring(0, 80)) + '</em></div>';
+    h += '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-top:4px">₱' + (amt ? amt.toLocaleString() : '0') + '</div>';
+    h += '</div></label>';
+  });
+  h += '</div>';
+  h += '<div style="background:var(--accent-soft);border-radius:10px;padding:12px;margin-top:12px;text-align:center">';
+  h += '<div style="font-size:11px;color:var(--text-dim)">Total ng na-confirm na units</div>';
+  h += '<div id="ucTotalAmt" style="font-size:22px;font-weight:800;color:var(--accent)">₱0</div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:14px">';
+  h += '<button class="btn btn-outline" style="flex:1" onclick="closeModal(\'editModal\')">Cancel</button>';
+  h += '<button class="btn btn-success" style="flex:1" onclick="confirmUnitsDone(\'' + bookingId + '\')">✅ Confirm & Mark Done</button>';
+  h += '</div>';
+
+  document.getElementById('emTitle').textContent = '✅ Confirm Units Serviced';
+  document.getElementById('emSub').textContent = b.name + ' — ' + (b.service || '');
+  document.getElementById('emBody').innerHTML = h;
+  document.getElementById('emActions').innerHTML = '';
+  document.getElementById('editModal').classList.add('active');
+  calcUnitConfirmTotal(bookingId);
+}
+
+function calcUnitConfirmTotal(bookingId) {
+  var b = BOOKINGS[bookingId];
+  if (!b) return;
+  var entries = b.serviceDetails.serviceEntries;
+  var total = 0;
+  var count = 0;
+  entries.forEach(function(e, i) {
+    var cb = document.getElementById('uc_unit_' + i);
+    if (cb && cb.checked) {
+      total += parseFloat(e.amount) || 0;
+      count++;
+    }
+  });
+  var el = document.getElementById('ucTotalAmt');
+  if (el) el.textContent = '₱' + total.toLocaleString() + ' (' + count + '/' + entries.length + ' units)';
+}
+
+function confirmUnitsDone(bookingId) {
+  var b = BOOKINGS[bookingId];
+  if (!b) return;
+  var entries = b.serviceDetails.serviceEntries;
+  var totalAmt = 0;
+  var confirmedCount = 0;
+  entries.forEach(function(e, i) {
+    var cb = document.getElementById('uc_unit_' + i);
+    if (cb && cb.checked) {
+      e.confirmed = true;
+      totalAmt += parseFloat(e.amount) || 0;
+      confirmedCount++;
+    } else {
+      e.confirmed = false;
+    }
+  });
+  if (confirmedCount === 0) {
+    showToast('Pumili ka muna ng kahit isang unit na na-service', 'warning');
+    return;
+  }
+  // Update summary to reflect confirmed units
+  var summaryParts = [];
+  entries.forEach(function(e) {
+    if (!e.confirmed) return;
+    var pts = [e.service || b.service || ''];
+    if (e.applianceType) pts.push(e.applianceType);
+    if (e.actype) pts.push(e.actype);
+    if (e.hp) pts.push(e.hp);
+    if (e.inverter === 'Yes') pts.push('Inverter');
+    if (e.brand) pts.push(e.brand);
+    if (e.wmcap) pts.push(e.wmcap);
+    if (e.floor) pts.push(e.floor);
+    if (e.amount) pts.push('₱' + parseFloat(e.amount).toLocaleString());
+    summaryParts.push(pts.join(' · '));
+  });
+  b.serviceDetailsSummary = summaryParts.join(' | ');
+  // Set amount = total of confirmed units' prices only
+  b.feeService = totalAmt || undefined;
+  // Preserve existing transpo/parts/other fees, recalculate total
+  var transpo = parseFloat(b.feeTranspo) || 0;
+  var parts = parseFloat(b.feeParts) || 0;
+  var other = parseFloat(b.feeOther) || 0;
+  var discount = parseFloat(b.feeDiscount) || 0;
+  var grandTotal = totalAmt + transpo + parts + other - discount;
+  b.amount = grandTotal > 0 ? String(grandTotal) : String(totalAmt);
+  b.status = 'Done';
+  b.completedAt = new Date().toISOString();
+  b._dirty = true;
+  saveLocalData();
+  syncBookingToSheets(b);
+  logActivity('✅', `${session.name} marked job ${bookingId} as Done — ${confirmedCount}/${entries.length} units confirmed, ₱${totalAmt.toLocaleString()}`, 'job');
+  closeModal('editModal');
+  closeModal('bookingModal');
+  showToast(`Job Done! ${confirmedCount} units confirmed — ₱${totalAmt.toLocaleString()} 💪`, 'success');
+  var activeView = document.querySelector('.view.active');
+  if (activeView) {
+    var vName = activeView.id.replace('view-', '');
+    activeView.innerHTML = renderView(vName);
+  }
 }
 
 /* ===========================
