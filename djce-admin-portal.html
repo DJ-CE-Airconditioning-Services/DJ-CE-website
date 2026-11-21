@@ -12077,14 +12077,20 @@ function mergeClients(){
         name:b.name,phone:b.phone||'',email:b.email||'',
         address:b.address||'',source:'booking',
         lastServiceDate:b.date||'',lastService:b.service||'',
+        serviceDetails:b.serviceDetails||null,
+        serviceDetailsSummary:b.serviceDetailsSummary||'',
         usage:b.usage||'',
-        nextCleaningDate:b.nextCleaningDate||calcNextCleaning(b.date,b.usage||'')
+        nextCleaningDate:b.nextCleaningDate||calcNextCleaning(b.date,b.usage||''),
+        lastAmount:b.amount||''
       };
     } else if((b.date||'')>(map[key].lastServiceDate||'')){
       map[key].lastServiceDate=b.date||'';
       map[key].lastService=b.service||'';
+      map[key].serviceDetails=b.serviceDetails||map[key].serviceDetails||null;
+      map[key].serviceDetailsSummary=b.serviceDetailsSummary||map[key].serviceDetailsSummary||'';
       if(b.usage)map[key].usage=b.usage;
       map[key].nextCleaningDate=calcNextCleaning(b.date,b.usage||map[key].usage||'');
+      if(b.amount) map[key].lastAmount=b.amount;
     }
     }catch(e){console.warn('Skip bad booking:',b.id,e);}
   });
@@ -12859,7 +12865,7 @@ function editClientModal(id){
   _activeSvcCtx='ec';
   _svcEntries=[];
   if(c.serviceDetails&&c.serviceDetails.serviceEntries&&c.serviceDetails.serviceEntries.length){
-    c.serviceDetails.serviceEntries.forEach(function(e){_svcEntries.push({id:Date.now()+'_'+_svcEntries.length,type:e.service||''});});
+    c.serviceDetails.serviceEntries.forEach(function(e){_svcEntries.push({id:Date.now()+'_'+_svcEntries.length,type:e.service||'',actype:e.actype||'',hp:e.hp||'',inverter:e.inverter||'',brand:e.brand||'',floor:e.floor||'',amount:e.amount||'',wmcap:e.wmcap||'',issue:e.issue||'',applianceType:e.applianceType||'',nextdate:e.nextdate||'',refrig:e.refrig||'',otherBrand:e.otherBrand||''});});
   } else if(c.lastService){
     // Old client with single service string — create one entry
     var svcs=c.lastService.split(',').map(function(s){return s.trim();});
