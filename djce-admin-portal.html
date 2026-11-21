@@ -3176,8 +3176,28 @@ function initServiceEntries(ctx){
   addServiceEntry(ctx);
 }
 
+function captureServiceValues(){
+  _svcEntries.forEach(function(entry,i){
+    var p='svc_'+i+'_';
+    var fields=['actype','hp','inverter','brand','brandOther','floor','amount','nextdate','wmcap','issue','applianceType','refrig','otherBrand'];
+    fields.forEach(function(f){
+      var el=document.getElementById(p+f);
+      if(el) entry[f]=el.value||'';
+    });
+    // also capture the tsAc/tsAwm sub-fields for Troubleshoot
+    ['ac_brand','ac_brandOther','wm_brand','wm_brandOther','wm_cap'].forEach(function(f){
+      var el=document.getElementById(p+f);
+      if(el) entry['_'+f]=el.value||'';
+    });
+    // capture service type
+    var typeSel=document.getElementById('svc_type_'+i);
+    if(typeSel) entry.type=typeSel.value||'';
+  });
+}
+
 function addServiceEntry(ctx){
   ctx=ctx||_activeSvcCtx;
+  captureServiceValues();
   _svcEntries.push({id: Date.now()+'_'+_svcEntries.length});
   renderServiceEntries(ctx);
 }
@@ -3185,6 +3205,7 @@ function addServiceEntry(ctx){
 function removeServiceEntry(idx,ctx){
   ctx=ctx||_activeSvcCtx;
   if(_svcEntries.length<=1){showToast('Need at least 1 service','error');return;}
+  captureServiceValues();
   _svcEntries.splice(idx,1);
   renderServiceEntries(ctx);
 }
@@ -3215,6 +3236,37 @@ function renderServiceEntries(ctx){
     if(entry.type){
       var sel=document.getElementById('svc_type_'+i);
       if(sel) sel.value=entry.type;
+    }
+    // Restore all captured field values
+    var p='svc_'+i+'_';
+    var fields=['actype','hp','inverter','brand','floor','amount','nextdate','wmcap','issue','applianceType','refrig','otherBrand'];
+    fields.forEach(function(f){
+      if(entry[f]!==undefined && entry[f]!==''){
+        var el=document.getElementById(p+f);
+        if(el){el.value=entry[f];}
+      }
+    });
+    // Restore brandOther visibility
+    if(entry.brand==='Other'){
+      var bo=document.getElementById(p+'brandOther');
+      if(bo){bo.style.display='block';if(entry.brandOther)bo.value=entry.brandOther;}
+    }
+    // Restore Troubleshoot sub-fields
+    if(entry.type==='Troubleshoot' && entry.applianceType){
+      var appEl=document.getElementById(p+'applianceType');
+      if(appEl){appEl.value=entry.applianceType;}
+      toggleTsFields(i);
+      ['ac_brand','ac_brandOther','wm_brand','wm_brandOther','wm_cap'].forEach(function(f){
+        if(entry['_'+f]){
+          var el=document.getElementById(p+f);
+          if(el) el.value=entry['_'+f];
+        }
+      });
+    }
+    // Restore next cleaning label
+    if(entry.nextdate){
+      var ndEl=document.getElementById(p+'nextdate');
+      if(ndEl){ndEl.value=entry.nextdate;showMonthsAway(ndEl,p+'nextlbl');}
     }
   });
 }
