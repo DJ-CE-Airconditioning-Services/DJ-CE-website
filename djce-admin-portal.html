@@ -2250,8 +2250,8 @@ function renderDashboard() {
               ${new Date(b.date+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric'})}
             </div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</div>
-              <div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔧 ${b.service||'—'} · 👷 ${techDisplay(b.technician)||'Unassigned'}</div>
+              <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(b.name)}</div>
+              <div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔧 ${escH(b.service||'—')} · 👷 ${escH(techDisplay(b.technician)||'Unassigned')}</div>
             </div>
             <span class="status-badge s-${(b.status||'pending').toLowerCase().replace(/ /g,'-')}" style="flex-shrink:0">${b.status}</span>
           </div>`;
@@ -2325,8 +2325,8 @@ function renderDashboard() {
                   :'<span style="color:var(--success);font-size:10.5px">in '+diff+'d</span>';
             return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openBookingDetail(\''+b.id+'\')">'
               +'<div style="flex:1;min-width:0">'
-              +'<div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.name+'</div>'
-              +'<div style="font-size:11px;color:var(--text-dim)">🔧 '+(b.service||'—')+'</div>'
+              +'<div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(b.name)+'</div>'
+              +'<div style="font-size:11px;color:var(--text-dim)">🔧 '+escH(b.service||'—')+'</div>'
               +'</div>'
               +'<div style="text-align:right">'
               +tag
@@ -2406,7 +2406,7 @@ function renderServiceChart() {
 function renderRecentBookings() {
   const bks = Object.values(BOOKINGS).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,4);
   if (!bks.length) return '<div class="empty" style="padding:20px"><div class="empty-ic">📋</div>No bookings yet</div>';
-  return bks.map(function(b){return '<div class="complaint-card" onclick="openBookingDetail(\''+b.id+'\')"><div class="cc-head"><div><div class="cc-title">'+(b.name||'Client')+'</div><div class="cc-meta">'+(b.service||'—')+'</div></div><span class="status-badge s-'+((b.status||'pending').toLowerCase())+'">'+(b.status||'Pending')+'</span></div><div class="cc-meta">📅 '+formatDate(b.date)+' · 📞 '+(b.phone||'—')+'</div></div>';}).join('');
+  return bks.map(function(b){return '<div class="complaint-card" onclick="openBookingDetail(\''+b.id+'\')"><div class="cc-head"><div><div class="cc-title">'+escH(b.name||'Client')+'</div><div class="cc-meta">'+escH(b.service||'—')+'</div></div><span class="status-badge s-'+((b.status||'pending').toLowerCase())+'">'+escH(b.status||'Pending')+'</span></div><div class="cc-meta">📅 '+formatDate(b.date)+' · 📞 '+escH(b.phone||'—')+'</div></div>';}).join('');
 }
 
 /* ===========================
@@ -2463,8 +2463,8 @@ function renderBookingRows(bks) {
     if(getPhotoCount(b.id)>0) btns += ' <span class="bc-tag" style="background:var(--info-soft);color:var(--info)">📷'+getPhotoCount(b.id)+'</span>';
     return '<tr>'
       +'<td><span style="font-family:monospace;font-size:10px;color:var(--accent)">'+(b.refNo||b.id||'—')+'</span></td>'
-      +'<td><strong>'+(b.name||'—')+'</strong><div style="font-size:11px;color:var(--text-dim)">'+(b.phone||'')+'</div></td>'
-      +'<td style="max-width:220px;font-size:12px;word-wrap:break-word;white-space:normal">'+(b.service||'—')+'</td>'
+      +'<td><strong>'+escH(b.name||'—')+'</strong><div style="font-size:11px;color:var(--text-dim)">'+escH(b.phone||'')+'</div></td>'
+      +'<td style="max-width:220px;font-size:12px;word-wrap:break-word;white-space:normal">'+escH(b.service||'—')+'</td>'
       +'<td style="font-size:12px">'+formatDate(b.date)+'</td>'
       +'<td style="font-size:12px">'+techHtml+'</td>'
       +'<td><span class="status-badge s-'+statusCls+'">'+(b.status||'Pending')+'</span></td>'
@@ -2506,8 +2506,8 @@ function openFeedbackForm(bookingId) {
     stars += '<span class="fb-star" data-val="'+i+'" onclick="setFeedbackStar('+i+')" style="font-size:28px;cursor:pointer;padding:2px 4px;opacity:0.3">⭐</span>';
   }
   var html = '<div style="text-align:center;margin-bottom:16px">'
-    +'<div style="font-size:14px;font-weight:700">'+b.name+'</div>'
-    +'<div style="font-size:12px;color:var(--text-dim)">'+b.service+' · '+formatDate(b.date)+'</div>'
+    +'<div style="font-size:14px;font-weight:700">'+escH(b.name)+'</div>'
+    +'<div style="font-size:12px;color:var(--text-dim)">'+escH(b.service)+' · '+formatDate(b.date)+'</div>'
     +'</div>'
     +'<div style="text-align:center;margin-bottom:16px">'
     +'<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">How was the service?</div>'
@@ -2587,27 +2587,27 @@ function openBookingDetail(id) {
     <div class="form-grid">
       <div><div class="sec-divider">Client Information</div>
         <div class="info-row"><span class="info-label">Reference No.</span><span class="info-val"><strong style="color:var(--accent);font-family:monospace">${b.refNo||b.id}</strong></span></div>
-        <div class="info-row"><span class="info-label">Name</span><span class="info-val"><strong>${b.name||'—'}</strong>${detBl?renderBlacklistBadge(b.name,b.phone):''}</span></div>
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-val">${b.phone||'—'}</span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-val">${b.email||'—'}</span></div>
-        <div class="info-row"><span class="info-label">Address</span><span class="info-val">${b.address||'—'}</span></div>
-        <div class="info-row"><span class="info-label">Landmark</span><span class="info-val">${b.landmark||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-val"><strong>${escH(b.name||'—')}</strong>${detBl?renderBlacklistBadge(b.name,b.phone):''}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-val">${escH(b.phone||'—')}</span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-val">${escH(b.email||'—')}</span></div>
+        <div class="info-row"><span class="info-label">Address</span><span class="info-val">${escH(b.address||'—')}</span></div>
+        <div class="info-row"><span class="info-label">Landmark</span><span class="info-val">${escH(b.landmark||'—')}</span></div>
       </div>
       <div><div class="sec-divider">Service Details</div>
-        <div class="info-row"><span class="info-label">Service</span><span class="info-val"><strong>${b.service||'—'}</strong></span></div>
+        <div class="info-row"><span class="info-label">Service</span><span class="info-val"><strong>${escH(b.service||'—')}</strong></span></div>
         ${(function(){
-          if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length) return b.serviceDetailsSummary?'<div class="info-row"><span class="info-label">Details</span><span class="info-val" style="font-size:12px;color:var(--text-dim)">'+b.serviceDetailsSummary+'</span></div>':'';
+          if(!b.serviceDetails||!b.serviceDetails.serviceEntries||!b.serviceDetails.serviceEntries.length) return b.serviceDetailsSummary?'<div class="info-row"><span class="info-label">Details</span><span class="info-val" style="font-size:12px;color:var(--text-dim)">'+escH(b.serviceDetailsSummary)+'</span></div>':'';
           return b.serviceDetails.serviceEntries.map(function(e,i){
             var parts=[];
-            if(e.applianceType) parts.push('<strong>'+e.applianceType+'</strong>');
-            if(e.actype) parts.push(e.actype);
-            if(e.hp) parts.push(e.hp);
+            if(e.applianceType) parts.push('<strong>'+escH(e.applianceType)+'</strong>');
+            if(e.actype) parts.push(escH(e.actype));
+            if(e.hp) parts.push(escH(e.hp));
             if(e.inverter==='Yes') parts.push('Inverter');
             if(e.inverter==='No') parts.push('Non-Inverter');
-            if(e.brand) parts.push(e.brand);
-            if(e.wmcap) parts.push(e.wmcap);
-            if(e.floor) parts.push(e.floor);
-            if(e.issue) parts.push('<em>'+e.issue.substring(0,80)+'</em>');
+            if(e.brand) parts.push(escH(e.brand));
+            if(e.wmcap) parts.push(escH(e.wmcap));
+            if(e.floor) parts.push(escH(e.floor));
+            if(e.issue) parts.push('<em>'+escH(e.issue.substring(0,80))+'</em>');
             if(e.amount) parts.push('₱'+parseFloat(e.amount).toLocaleString());
             if(!parts.length) return '';
             var confirmBadge='';
@@ -2618,7 +2618,7 @@ function openBookingDetail(id) {
           }).join('');
         })()}
         <div class="info-row"><span class="info-label">Tier</span><span class="info-val">${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">🔴 Rush</span>':'<span style="color:var(--success);font-size:12px">🟢 Normal</span>'}</span></div>
-        ${b.contactPerson?'<div class="info-row"><span class="info-label">Contact @ Site</span><span class="info-val"><strong>'+b.contactPerson+'</strong>'+(b.contactPhone?' · '+b.contactPhone:'')+'</span></div>':''}
+        ${b.contactPerson?'<div class="info-row"><span class="info-label">Contact @ Site</span><span class="info-val"><strong>'+escH(b.contactPerson)+'</strong>'+(b.contactPhone?' · '+escH(b.contactPhone):'')+'</span></div>':''}
         <div class="info-row"><span class="info-label">Date</span><span class="info-val">${formatDate(b.date)}</span></div>
         <div class="info-row"><span class="info-label">Time</span><span class="info-val">${b.time||'—'}</span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="status-badge s-${(b.status||'pending').toLowerCase()}">${b.status||'Pending'}</span></span></div>
@@ -2638,8 +2638,8 @@ function openBookingDetail(id) {
             return `<div style="display:flex;flex-direction:column;gap:2px">${rows.join('')}<strong style="color:var(--accent);margin-top:3px;font-size:13px">Total: ₱${b.amount?parseFloat(b.amount).toLocaleString():'—'}</strong></div>`;
           })()}
         </span></div>
-        <div class="info-row"><span class="info-label">Notes</span><span class="info-val">${b.notes||'—'}</span></div>
-        <div class="info-row"><span class="info-label">Usage</span><span class="info-val">${b.usage||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Notes</span><span class="info-val">${escH(b.notes||'—')}</span></div>
+        <div class="info-row"><span class="info-label">Usage</span><span class="info-val">${escH(b.usage||'—')}</span></div>
         <div class="info-row"><span class="info-label">Next Cleaning</span><span class="info-val">${b.nextCleaningDate?formatDate(b.nextCleaningDate):'—'}</span></div>
         <div class="info-row"><span class="info-label">Follow-up</span><span class="info-val">${b.followedUp==='email-sent'?'<span style="color:var(--success);font-weight:600">✅ Reminder Sent</span>':b.followedUp||'<span style="color:var(--text-dim)">Not yet</span>'} ${b.email && b.nextCleaningDate && session.role!=='tech'?'<button class="btn btn-outline btn-xs" style="margin-left:8px;font-size:11px" onclick="sendBookingReminder(\''+b.id+'\')">📧 Send Reminder</button>':''}</span></div>
         ${(function(){
@@ -2647,7 +2647,7 @@ function openBookingDetail(id) {
           if (fb) {
             var stars = '';
             for(var i=1;i<=5;i++) stars += i<=fb.rating?'⭐':'☆';
-            return '<div class="info-row"><span class="info-label">Feedback</span><span class="info-val"><span style="font-size:16px">'+stars+'</span> <span style="color:var(--text-dim);font-size:12px">('+fb.rating+'/5)</span>'+(fb.comment?'<div style="font-size:12px;margin-top:4px;color:var(--text-dim)">💬 '+fb.comment+'</div>':'')+'</span></div>';
+            return '<div class="info-row"><span class="info-label">Feedback</span><span class="info-val"><span style="font-size:16px">'+stars+'</span> <span style="color:var(--text-dim);font-size:12px">('+fb.rating+'/5)</span>'+(fb.comment?'<div style="font-size:12px;margin-top:4px;color:var(--text-dim)">💬 '+escH(fb.comment)+'</div>':'')+'</span></div>';
           } else if (b.status==='Done') {
             return '<div class="info-row"><span class="info-label">Feedback</span><span class="info-val"><button class="btn btn-outline btn-xs" onclick="openFeedbackForm(\''+b.id+'\')">⭐ Add Rating</button></span></div>';
           }
@@ -2672,8 +2672,8 @@ function openBookingDetail(id) {
         return '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px"><div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:6px">📝 Correction History</div>'
           +corrs.map(function(c){
             return '<div style="font-size:11px;color:var(--text-dim);padding:3px 0;border-bottom:1px solid var(--border)">'
-              +'<strong>'+c.field+'</strong>: '+(c.oldVal?formatTimeShort(c.oldVal):'(empty)')+' → '+formatTimeShort(c.newVal)
-              +' — by '+c.editedBy+' · '+(c.reason||'no reason')+' · '+new Date(c.timestamp).toLocaleDateString()+'</div>';
+              +'<strong>'+escH(c.field)+'</strong>: '+(c.oldVal?formatTimeShort(c.oldVal):'(empty)')+' → '+formatTimeShort(c.newVal)
+              +' — by '+escH(c.editedBy)+' · '+escH(c.reason||'no reason')+' · '+new Date(c.timestamp).toLocaleDateString()+'</div>';
           }).join('')+'</div>';
       })()}
     </div>
@@ -2698,10 +2698,10 @@ function openBookingDetail(id) {
         <select id="detTier">${SERVICE_TIERS.map(t=>'<option value="'+t.value+'" '+(b.serviceTier===t.value?'selected':'')+'>'+t.label+'</option>').join('')}</select>
       </div>
       <div class="field"><label>👤 Contact Person @ Site</label>
-        <input type="text" id="detContact" value="${b.contactPerson||''}" placeholder="Sino aabutan sa bahay?">
+        <input type="text" id="detContact" value="${escH(b.contactPerson||'')}" placeholder="Sino aabutan sa bahay?">
       </div>
       <div class="field"><label>📱 Contact Person Phone</label>
-        <input type="tel" id="detContactPhone" value="${b.contactPhone||''}" placeholder="Phone ng aabutan">
+        <input type="tel" id="detContactPhone" value="${escH(b.contactPhone||'')}" placeholder="Phone ng aabutan">
       </div>
       <div class="field"><label>🔔 On Call Type</label>
         <select id="detOncallType">
@@ -2713,10 +2713,10 @@ function openBookingDetail(id) {
         </select>
       </div>
       <div class="field"><label>🔔 On Call Name</label>
-        <input type="text" id="detOncall" value="${b.oncallHelper||''}" placeholder="Pangalan ng on-call">
+        <input type="text" id="detOncall" value="${escH(b.oncallHelper||'')}" placeholder="Pangalan ng on-call">
       </div>
       <div class="field"><label>Notes</label>
-        <input type="text" id="detNotes" value="${b.notes||''}" placeholder="Internal notes">
+        <input type="text" id="detNotes" value="${escH(b.notes||'')}" placeholder="Internal notes">
       </div>
       <div class="field"><label>Usage Frequency</label>
         <select id="detUsage"><option value="">— Select —</option>${USAGE_OPTS.map(u=>`<option ${b.usage===u.label?'selected':''}>${u.label}</option>`).join('')}</select>
@@ -3567,10 +3567,10 @@ function openNewBooking(name='',phone='',address='') {
       <span style="font-size:11px;opacity:.85">Proceed with caution. Management approval recommended.</span>
     </div>
     <div class="form-grid">
-      <div class="field form-full"><label>Client Name *</label><input id="nb_name" value="${name}" placeholder="e.g. Juan Dela Cruz" oninput="checkBlacklistWarning()"></div>
-      <div class="field"><label>Phone *</label><input id="nb_phone" value="${phone}" placeholder="09171234567" type="tel" oninput="checkBlacklistWarning()"></div>
+      <div class="field form-full"><label>Client Name *</label><input id="nb_name" value="${escH(name)}" placeholder="e.g. Juan Dela Cruz" oninput="checkBlacklistWarning()"></div>
+      <div class="field"><label>Phone *</label><input id="nb_phone" value="${escH(phone)}" placeholder="09171234567" type="tel" oninput="checkBlacklistWarning()"></div>
       <div class="field"><label>Email</label><input id="nb_email" placeholder="email@example.com" type="email"></div>
-      <div class="field form-full"><label>Address *</label><input id="nb_address" value="${address}" placeholder="House/Street/Barangay/City" oninput="autoFillTranspoFromAddress()"></div>
+      <div class="field form-full"><label>Address *</label><input id="nb_address" value="${escH(address)}" placeholder="House/Street/Barangay/City" oninput="autoFillTranspoFromAddress()"></div>
       <div class="field form-full" id="nb_transpoDisplay"></div>
       <div class="field"><label>Landmark</label><input id="nb_landmark" placeholder="e.g. Near Jollibee"></div>
       <div class="field"><label>👤 Contact Person @ Site</label><input id="nb_contact" placeholder="Sino aabutan sa bahay?"></div>
@@ -4054,17 +4054,17 @@ function renderWaitlistCard(w) {
   const prefDate = w.preferredDate ? formatDate(w.preferredDate.substring(0,10)) : 'Any';
   return `<div class="booking-card" style="border-left:4px solid #8b5cf6">
     <div class="bc-head">
-      <div class="bc-avatar" style="background:#8b5cf6;color:#fff">${(w.name||'?')[0].toUpperCase()}</div>
-      <div><div class="bc-name">${w.name||'—'}</div><div class="bc-id">${w.id||''}</div></div>
+      <div class="bc-avatar" style="background:#8b5cf6;color:#fff">${escH((w.name||'?')[0].toUpperCase())}</div>
+      <div><div class="bc-name">${escH(w.name||'—')}</div><div class="bc-id">${escH(w.id||'')}</div></div>
       <span class="status-badge" style="background:rgba(139,92,246,0.15);color:#8b5cf6;margin-left:auto">⏳ Waiting</span>
     </div>
-    <div class="bc-service">🔧 ${w.service||'Not specified'}</div>
+    <div class="bc-service">🔧 ${escH(w.service||'Not specified')}</div>
     <div class="bc-meta">
       <span class="bc-tag" style="background:var(--bg-elev2)">📅 Preferred: ${prefDate}</span>
-      <span class="bc-tag" style="background:var(--bg-elev2)">📞 ${w.phone||'—'}</span>
-      ${w.city?`<span class="bc-tag" style="background:var(--bg-elev2)">📍 ${w.city}</span>`:''}
+      <span class="bc-tag" style="background:var(--bg-elev2)">📞 ${escH(w.phone||'—')}</span>
+      ${w.city?`<span class="bc-tag" style="background:var(--bg-elev2)">📍 ${escH(w.city)}</span>`:''}
     </div>
-    ${w.notes?`<div style="font-size:12px;color:var(--text-dim);margin-top:6px;padding:0 4px;">💬 ${w.notes}</div>`:''}
+    ${w.notes?`<div style="font-size:12px;color:var(--text-dim);margin-top:6px;padding:0 4px;">💬 ${escH(w.notes)}</div>`:''}
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-success btn-xs" onclick="convertWaitlistToBooking('${w.id}')">✅ Convert to Booking</button>
       <button class="btn btn-outline btn-xs" onclick="addWaitlistManual()">➕ Add to Waitlist</button>
@@ -4197,11 +4197,11 @@ function renderJobCard(b, tab, techOptions) {
   return `<div class="booking-card" style="border-color:${borderColor}" onclick="openBookingDetail('${b.id}')">
     <div class="bc-head">
       <div class="bc-avatar">${(b.name||'?')[0].toUpperCase()}</div>
-      <div><div class="bc-name">${b.name||'—'}</div><div class="bc-id">${b.id}</div></div>
-      <span class="status-badge s-${(b.status||'pending').toLowerCase().replace(/ /g,'-')}" style="margin-left:auto">${b.status}</span>
+      <div><div class="bc-name">${escH(b.name||'—')}</div><div class="bc-id">${b.id}</div></div>
+      <span class="status-badge s-${(b.status||'pending').toLowerCase().replace(/ /g,'-')}" style="margin-left:auto">${escH(b.status)}</span>
     </div>
-    <div class="bc-service">🔧 ${b.service||'—'}</div>
-    <div style="font-size:11.5px;color:var(--text-dim);margin:4px 0">📍 ${b.address||'—'}</div>
+    <div class="bc-service">🔧 ${escH(b.service||'—')}</div>
+    <div style="font-size:11.5px;color:var(--text-dim);margin:4px 0">📍 ${escH(b.address||'—')}</div>
     <div class="bc-meta">
       <span class="bc-tag" style="background:${today?'var(--accent-soft)':'var(--bg-elev2)'};color:${today?'var(--accent)':'inherit'}">${today?'🔥 TODAY':'📅'} ${formatDate(b.date)}</span>
       ${overdue?`<span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">⏰ Overdue</span>`:''}
@@ -4262,10 +4262,10 @@ function renderBookingCard(b) {
   return `<div class="booking-card" onclick="openBookingDetail('${b.id}')"${bkBl?' style="border-left:4px solid #dc2626"':''}>
     <div class="bc-head">
       <div class="bc-avatar"${bkBl?' style="background:#dc2626;color:#fff"':''}>${(b.name||'?')[0].toUpperCase()}</div>
-      <div><div class="bc-name">${b.name||'—'}${bkBl?renderBlacklistBadge(b.name,b.phone):''}</div><div class="bc-id">${b.id}</div></div>
-      <span class="status-badge s-${(b.status||'pending').toLowerCase()}" style="margin-left:auto">${b.status}</span>
+      <div><div class="bc-name">${escH(b.name||'—')}${bkBl?renderBlacklistBadge(b.name,b.phone):''}</div><div class="bc-id">${b.id}</div></div>
+      <span class="status-badge s-${(b.status||'pending').toLowerCase()}" style="margin-left:auto">${escH(b.status)}</span>
     </div>
-    <div class="bc-service">🔧 ${b.service||'—'} ${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">🔴 Rush</span>':''}</div>
+    <div class="bc-service">🔧 ${escH(b.service||'—')} ${b.serviceTier==='VIP'?'<span style="background:var(--accent-soft);color:var(--accent);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:var(--danger-soft);color:var(--danger);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">🔴 Rush</span>':''}</div>
     <div class="bc-meta">
       <span class="bc-tag" style="background:var(--bg-elev2)">📅 ${formatDate(b.date)}</span>
       <span class="bc-tag" style="background:var(--bg-elev2)">👷 ${techDisplay(b.technician)||'Unassigned'}</span>
@@ -4313,11 +4313,11 @@ function renderMyJobs() {
     }
     return '<div class="booking-card" style="border-left:4px solid '+(b.status==='Ongoing'?'var(--success)':b.status==='Confirmed'?'var(--accent)':'var(--warning)')+'" onclick="openBookingDetail(\''+b.id+'\')">'
       +(isBlacklisted(b.name,b.phone)?'<div style="background:#dc2626;color:#fff;padding:6px 10px;border-radius:8px;margin-bottom:6px;font-size:11px;font-weight:700">🚫 BLACKLISTED CLIENT — mag-ingat!</div>':'')
-      +'<div class="bc-head"><div class="bc-avatar"'+(isBlacklisted(b.name,b.phone)?' style="background:#dc2626;color:#fff"':'')+'>'+((b.name||'?')[0].toUpperCase())+'</div><div><div class="bc-name">'+(b.name||'—')+renderBlacklistBadge(b.name,b.phone)+'</div><div class="bc-id">'+b.id+'</div></div><span class="status-badge s-'+((b.status||'pending').toLowerCase())+'" style="margin-left:auto">'+b.status+'</span></div>'
-      +'<div class="bc-service">🔧 '+(b.service||'—')+'</div>'
-      +(b.serviceDetailsSummary?'<div style="font-size:11px;color:var(--text-dim);margin-top:2px">'+b.serviceDetailsSummary+'</div>':(typeof b.serviceDetails==='string'&&b.serviceDetails?'<div style="font-size:11px;color:var(--text-dim);margin-top:2px">'+b.serviceDetails+'</div>':''))
-      +'<div style="font-size:12px;color:var(--text-dim);margin:6px 0">📍 '+(b.address||'—')+'</div>'
-      +'<div class="bc-meta"><span class="bc-tag" style="background:var(--bg-elev2)">📅 '+formatDate(b.date)+'</span><span class="bc-tag" style="background:var(--bg-elev2)">🕐 '+(b.time||'—')+'</span>'+(b.amount?'<span class="bc-tag" style="background:var(--bg-elev2)">💰 ₱'+parseFloat(b.amount).toLocaleString()+'</span>':'')+'</div>'
+      +'<div class="bc-head"><div class="bc-avatar"'+(isBlacklisted(b.name,b.phone)?' style="background:#dc2626;color:#fff"':'')+'>'+escH((b.name||'?')[0].toUpperCase())+'</div><div><div class="bc-name">'+escH(b.name||'—')+renderBlacklistBadge(b.name,b.phone)+'</div><div class="bc-id">'+b.id+'</div></div><span class="status-badge s-'+((b.status||'pending').toLowerCase())+'" style="margin-left:auto">'+escH(b.status)+'</span></div>'
+      +'<div class="bc-service">🔧 '+escH(b.service||'—')+'</div>'
+      +(b.serviceDetailsSummary?'<div style="font-size:11px;color:var(--text-dim);margin-top:2px">'+escH(b.serviceDetailsSummary)+'</div>':(typeof b.serviceDetails==='string'&&b.serviceDetails?'<div style="font-size:11px;color:var(--text-dim);margin-top:2px">'+escH(b.serviceDetails)+'</div>':''))
+      +'<div style="font-size:12px;color:var(--text-dim);margin:6px 0">📍 '+escH(b.address||'—')+'</div>'
+      +'<div class="bc-meta"><span class="bc-tag" style="background:var(--bg-elev2)">📅 '+formatDate(b.date)+'</span><span class="bc-tag" style="background:var(--bg-elev2)">🕐 '+escH(b.time||'—')+'</span>'+(b.amount?'<span class="bc-tag" style="background:var(--bg-elev2)">💰 ₱'+parseFloat(b.amount).toLocaleString()+'</span>':'')+'</div>'
       +tkHtml
       +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'
       +'<a href="'+mapsUrl+'" target="_blank" class="btn btn-outline btn-xs" onclick="event.stopPropagation()">📍 Navigate</a>'
@@ -4585,10 +4585,10 @@ function renderClientRows(clients) {
       '<button class="btn btn-danger btn-xs" onclick="deleteClient(\''+eId+'\',\''+eName+'\')" title="Delete">🗑️</button>' : '';
     return '<tr'+(bl?' style="background:rgba(220,38,38,0.06)"':'')+'>' +
       '<td><strong>'+escH(c.name)+'</strong>'+(bl?renderBlacklistBadge(c.name,c.phone):'')+(c.email?'<div style="font-size:10.5px;color:var(--text-dim)">'+escH(c.email)+'</div>':'')+'</td>' +
-      '<td>'+(c.phone||'—')+'</td>' +
-      '<td style="font-size:12px;max-width:220px;word-wrap:break-word;white-space:normal">'+(c.address||'—')+(c.landmark?'<div style="font-size:10.5px;color:var(--gold);margin-top:3px"><strong>📍 Landmark:</strong> '+escH(c.landmark)+'</div>':'')+ renderLocationBadges(c.locationInfo)+'</td>' +
-      '<td style="font-size:12px">'+formatDate(c.lastServiceDate)+'<div style="font-size:10.5px;color:var(--text-dim)">'+(c.lastService||'—')+'</div></td>' +
-      '<td style="font-size:11.5px">'+(c.usage||'<span style="color:var(--text-dim)">Not set</span>')+'</td>' +
+      '<td>'+escH(c.phone||'—')+'</td>' +
+      '<td style="font-size:12px;max-width:220px;word-wrap:break-word;white-space:normal">'+escH(c.address||'—')+(c.landmark?'<div style="font-size:10.5px;color:var(--gold);margin-top:3px"><strong>📍 Landmark:</strong> '+escH(c.landmark)+'</div>':'')+ renderLocationBadges(c.locationInfo)+'</td>' +
+      '<td style="font-size:12px">'+formatDate(c.lastServiceDate)+'<div style="font-size:10.5px;color:var(--text-dim)">'+escH(c.lastService||'—')+'</div></td>' +
+      '<td style="font-size:11.5px">'+(c.usage?escH(c.usage):'<span style="color:var(--text-dim)">Not set</span>')+'</td>' +
       '<td style="font-size:12px">'+(next?formatDate(c.nextCleaningDate):'—')+'</td>' +
       '<td><span class="status-badge '+sCls+'">'+sLbl+'</span></td>' +
       '<td style="white-space:nowrap">' +
@@ -4907,7 +4907,7 @@ function renderSlotSidePanel(dateStr){
         +(s.place?'<div style="font-size:11px;color:var(--info);margin-bottom:6px;">📍 '+s.place+'</div>':'')
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
           +'<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;max-width:120px;"><div style="height:100%;width:'+pct+'%;background:'+(isFull?'var(--danger)':'var(--success)')+';border-radius:3px;"></div></div>'
-          +'<span style="font-size:11px;color:var(--text-dim);">'+s.currentBookings+'/'+s.maxBookings+' booked'+(s.notes?' · '+s.notes:'')+'</span>'
+          +'<span style="font-size:11px;color:var(--text-dim);">'+s.currentBookings+'/'+s.maxBookings+' booked'+(s.notes?' · '+escH(s.notes):'')+'</span>'
         +'</div>'
         +'<div style="display:flex;gap:5px;flex-wrap:wrap;">'
           +'<button class="btn btn-outline btn-xs" onclick="openEditSlotModal(\''+s.slotId+'\')">✏️ Edit</button>'
@@ -5026,7 +5026,7 @@ function openEditSlotModal(slotId){
     +'<div class="field" style="grid-column:1/-1"><label>📍 Place / Area</label><select id="editSlotPlace"><option value="">— Select Place —</option>'+editPlaceOpts+'</select></div>'
     +'<div class="field"><label>🕐 Time</label><input type="time" id="editSlotStart" value="'+startT+'"></div>'
     +'<div class="field"><label>Max Bookings</label><input type="number" id="editSlotMax" value="'+(s.maxBookings||1)+'" min="1" max="10"></div>'
-    +'<div class="field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="editSlotNotes" value="'+(s.notes||'')+'" placeholder="Optional notes"></div>'
+    +'<div class="field" style="grid-column:1/-1"><label>Notes</label><input type="text" id="editSlotNotes" value="'+escH(s.notes||'')+'" placeholder="Optional notes"></div>'
     +'</div>'
     +'<div style="display:flex;gap:8px;margin-top:12px;">'
       +'<button class="btn btn-gold btn-sm" onclick="saveEditSlot(\''+slotId+'\')" style="flex:1;">💾 Save Changes</button>'
@@ -5344,11 +5344,11 @@ function buildScheduleHtml(fromDate, toDate, techFilter, _unused) {
           return `<div class="complaint-card" style="margin:0;border-left-color:${unassigned?'var(--warning)':isT?'var(--accent)':'var(--info)'}" onclick="openBookingDetail('${b.id}')">
             <div class="cc-head">
               <div style="flex:1">
-                <div class="cc-title">${b.name} · ${b.service}</div>
+                <div class="cc-title">${escH(b.name)} · ${escH(b.service)}</div>
                 <div class="cc-meta">
-                  👷 <strong style="color:${unassigned?'var(--warning)':'inherit'}">${techDisplay(b.technician)||'⚠️ Unassigned'}</strong>
-                  · 🕐 ${b.time||'TBD'}
-                  · 📍 ${b.address||'—'}
+                  👷 <strong style="color:${unassigned?'var(--warning)':'inherit'}">${escH(techDisplay(b.technician)||'⚠️ Unassigned')}</strong>
+                  · 🕐 ${escH(b.time||'TBD')}
+                  · 📍 ${escH(b.address||'—')}
                   ${b.amount?`· <span style="color:var(--accent)">₱${parseFloat(b.amount).toLocaleString()}</span>`:''}
                 </div>
               </div>
@@ -5408,7 +5408,7 @@ function renderComplaintsList(list) {
       '<span style="background:rgba(59,130,246,0.15);color:#3b82f6;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:700">📋 Client</span>';
     return '<div class="'+cls+'" data-cid="'+c.id+'" onclick="openComplaintDetail(this.dataset.cid)">'
       +'<div class="cc-head"><div><div class="cc-title">'+escH(c.title)+'</div>'
-      +'<div class="cc-meta">'+(c.bookingId||'No booking')+' · '+(c.clientName||'N/A')+' · '+formatDate(c.createdAt)+'</div></div>'
+      +'<div class="cc-meta">'+(c.bookingId||'No booking')+' · '+escH(c.clientName||'N/A')+' · '+formatDate(c.createdAt)+'</div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
       +srcBadge
       +'<span class="status-badge s-'+(c.status==='Open'?'pending':'done')+'">'+c.status+'</span>'
@@ -5439,7 +5439,7 @@ function renderBlacklistPanel() {
     active.map(function(b){
       return '<div class="complaint-card urgent" style="border-left-color:#dc2626">' +
         '<div class="cc-head"><div><div class="cc-title">🚫 '+escH(b.clientName)+'</div>' +
-        '<div class="cc-meta">📞 '+(b.phone||'—')+' · Reason: <strong>'+escH(b.reason)+'</strong></div></div>' +
+        '<div class="cc-meta">📞 '+escH(b.phone||'—')+' · Reason: <strong>'+escH(b.reason)+'</strong></div></div>' +
         (session.role==='owner'||session.role==='admin' ? '<button class="btn btn-success btn-xs" onclick="event.stopPropagation();liftBlacklist(\''+b.id+'\')">✅ Lift</button>' : '') +
         '</div>' +
         '<div class="cc-meta" style="margin-top:4px">'+escH(b.notes||'')+'</div>' +
@@ -5517,8 +5517,8 @@ function renderBackjobHistory() {
   var rows = backjobs.map(function(b){
     return '<tr>'
       +'<td><strong>'+b.id+'</strong></td>'
-      +'<td>'+b.name+'</td>'
-      +'<td>'+b.service+'</td>'
+      +'<td>'+escH(b.name)+'</td>'
+      +'<td>'+escH(b.service)+'</td>'
       +'<td>'+(techDisplay(b.technician)||'Unassigned')+'</td>'
       +'<td>'+formatDate(b.date)+'</td>'
       +'<td><span class="status-badge s-for-backjob">For Backjob</span></td>'
@@ -5612,7 +5612,7 @@ function openNewComplaint() {
     </div>
     <div id="cmp_techFields" style="display:none">
       <div class="field"><label>🔧 Technician Name *</label>
-        <select id="cmp_techName"><option value="">— Select Technician —</option>${getTechnicians().map(function(t){return '<option>'+t+'</option>';}).join('')}</select>
+        <select id="cmp_techName"><option value="">— Select Technician —</option>${getTechnicians().map(function(t){return '<option>'+escH(t)+'</option>';}).join('')}</select>
       </div>
       <div class="field"><label>About / Against</label>
         <select id="cmp_aboutType" onchange="toggleComplaintAbout()">
@@ -5847,12 +5847,12 @@ function renderLogistics(){
             if(loc.needStockWater) alerts.push('💧Stock');
             return '<div style="padding:8px 0;border-top:1px solid var(--border);font-size:12px" onclick="openBookingDetail(\''+b.id+'\')" style="cursor:pointer">'+
               '<div style="display:flex;justify-content:space-between;align-items:center">'+
-              '<strong>'+b.name+'</strong> '+tierBadge(b)+
-              '<span class="status-badge s-'+(b.status||'pending').toLowerCase()+'" style="font-size:10px">'+b.status+'</span>'+
+              '<strong>'+escH(b.name)+'</strong> '+tierBadge(b)+
+              '<span class="status-badge s-'+(b.status||'pending').toLowerCase()+'" style="font-size:10px">'+escH(b.status)+'</span>'+
               '</div>'+
-              '<div style="color:var(--text-dim);font-size:11px;margin-top:2px">'+b.service+' · '+(b.time||'—')+'</div>'+
-              '<div style="color:var(--text-dim);font-size:11px">📍 '+(b.address||'—')+'</div>'+
-              (b.contactPerson?'<div style="color:var(--info);font-size:11px">👤 '+b.contactPerson+(b.contactPhone?' · '+b.contactPhone:'')+'</div>':'')+
+              '<div style="color:var(--text-dim);font-size:11px;margin-top:2px">'+escH(b.service)+' · '+escH(b.time||'—')+'</div>'+
+              '<div style="color:var(--text-dim);font-size:11px">📍 '+escH(b.address||'—')+'</div>'+
+              (b.contactPerson?'<div style="color:var(--info);font-size:11px">👤 '+escH(b.contactPerson)+(b.contactPhone?' · '+escH(b.contactPhone):'')+'</div>':'')+
               (alerts.length?'<div style="font-size:11px;margin-top:2px">⚠️ '+alerts.join(' ')+'</div>':'')+
               '</div>';
           }).join('')+
@@ -5991,10 +5991,10 @@ function openReceiptModal(id, type='receipt') {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #e8eef8">
         <div style="padding:12px 20px;border-right:1px solid #e8eef8">
           <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.6px;color:#0d1f3c;margin-bottom:6px">BILL TO:</div>
-          <div style="font-size:12.5px;font-weight:700;color:#0a1628">${b.name||'—'} ${b.serviceTier==='VIP'?'<span style="background:#fff3cd;color:#b8860b;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:#fde8e6;color:#c00;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700">🔴 RUSH</span>':''}</div>
-          <div style="font-size:11px;color:#555;margin-top:2px">${b.address||'—'}</div>
-          <div style="font-size:11px;color:#555">${b.phone||''}${b.email?' · '+b.email:''}</div>
-          ${b.contactPerson?'<div style="font-size:10.5px;color:#0d1f3c;margin-top:3px;font-weight:600">👤 Contact @ site: '+b.contactPerson+(b.contactPhone?' · '+b.contactPhone:'')+'</div>':''}
+          <div style="font-size:12.5px;font-weight:700;color:#0a1628">${escH(b.name||'—')} ${b.serviceTier==='VIP'?'<span style="background:#fff3cd;color:#b8860b;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700">⭐ VIP</span>':b.serviceTier==='Rush'?'<span style="background:#fde8e6;color:#c00;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700">🔴 RUSH</span>':''}</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">${escH(b.address||'—')}</div>
+          <div style="font-size:11px;color:#555">${escH(b.phone||'')}${b.email?' · '+escH(b.email):''}</div>
+          ${b.contactPerson?'<div style="font-size:10.5px;color:#0d1f3c;margin-top:3px;font-weight:600">👤 Contact @ site: '+escH(b.contactPerson)+(b.contactPhone?' · '+escH(b.contactPhone):'')+'</div>':''}
         </div>
         <div style="padding:12px 20px">
           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:11px">
@@ -6021,8 +6021,8 @@ function openReceiptModal(id, type='receipt') {
           <tbody>
             <tr style="border-bottom:1px solid #e8eef8">
               <td style="padding:10px 10px">1</td>
-              <td style="padding:10px 10px;font-weight:600">${b.service||'Service'}${b.serviceDetailsSummary?'<br><span style="font-size:10px;color:#555;font-weight:400">'+b.serviceDetailsSummary+'</span>':''}</td>
-              <td style="padding:10px 10px;color:#666;font-size:11px">${b.notes||'—'}</td>
+              <td style="padding:10px 10px;font-weight:600">${escH(b.service||'Service')}${b.serviceDetailsSummary?'<br><span style="font-size:10px;color:#555;font-weight:400">'+escH(b.serviceDetailsSummary)+'</span>':''}</td>
+              <td style="padding:10px 10px;color:#666;font-size:11px">${escH(b.notes||'—')}</td>
               <td style="padding:10px 10px;text-align:right;font-weight:700;color:#0d1f3c">${(b.feeService||b.amount)?'₱'+parseFloat(b.feeService||b.amount||0).toLocaleString():'₱ —'}</td>
             </tr>
             ${b.feeParts?`<tr style="border-bottom:1px solid #e8eef8">
@@ -6063,7 +6063,7 @@ function openReceiptModal(id, type='receipt') {
         <div>
           <div style="font-size:10px;font-weight:700;color:#0d1f3c;margin-bottom:4px">MODE OF PAYMENT:</div>
           <div style="font-size:11px">${b.payment||'Cash / GCash'}</div>
-          ${b.contactPerson?'<div style="font-size:10px;color:#333;margin-top:6px"><strong>Authorized Rep:</strong> '+b.contactPerson+(b.contactPhone?' · '+b.contactPhone:'')+'</div>':''}
+          ${b.contactPerson?'<div style="font-size:10px;color:#333;margin-top:6px"><strong>Authorized Rep:</strong> '+escH(b.contactPerson)+(b.contactPhone?' · '+escH(b.contactPhone):'')+'</div>':''}
           <div style="border-top:1px solid #0d1f3c;margin-top:22px;padding-top:4px;font-size:9.5px;color:#555">Client / Authorized Rep Signature</div>
         </div>
         <div style="text-align:right">
@@ -6401,20 +6401,20 @@ function generateServiceAgreement(id) {
     +'<div class="section-title">I. Parties</div>'
     +'<table>'
     +'<tr><td>Service Provider</td><td><strong>DJ-CE Air-conditioning Services</strong></td></tr>'
-    +'<tr><td>Client Name</td><td><strong>'+(b.name||'—')+'</strong></td></tr>'
-    +'<tr><td>Contact Number</td><td>'+(b.phone||'—')+'</td></tr>'
-    +'<tr><td>Email</td><td>'+(b.email||'—')+'</td></tr>'
-    +'<tr><td>Service Address</td><td>'+(b.address||'—')+(b.landmark?' ('+b.landmark+')':'')+'</td></tr>'
+    +'<tr><td>Client Name</td><td><strong>'+escH(b.name||'—')+'</strong></td></tr>'
+    +'<tr><td>Contact Number</td><td>'+escH(b.phone||'—')+'</td></tr>'
+    +'<tr><td>Email</td><td>'+escH(b.email||'—')+'</td></tr>'
+    +'<tr><td>Service Address</td><td>'+escH(b.address||'—')+(b.landmark?' ('+escH(b.landmark)+')':'')+'</td></tr>'
     +'</table></div>'
 
     +'<div class="section">'
     +'<div class="section-title">II. Scope of Work</div>'
     +'<table>'
-    +'<tr><td>Service Type</td><td><strong>'+(b.service||'—')+'</strong></td></tr>'
+    +'<tr><td>Service Type</td><td><strong>'+escH(b.service||'—')+'</strong></td></tr>'
     +'<tr><td>Scheduled Date</td><td>'+formatDate(b.date)+'</td></tr>'
-    +'<tr><td>Scheduled Time</td><td>'+(b.time||'To be confirmed')+'</td></tr>'
+    +'<tr><td>Scheduled Time</td><td>'+escH(b.time||'To be confirmed')+'</td></tr>'
     +'<tr><td>Assigned Technician(s)</td><td>'+(techDisplay(b.technician)||'To be assigned')+'</td></tr>'
-    +'<tr><td>Notes / Special Instructions</td><td>'+(b.notes||'None')+'</td></tr>'
+    +'<tr><td>Notes / Special Instructions</td><td>'+escH(b.notes||'None')+'</td></tr>'
     +'</table></div>'
 
     +'<div class="section">'
@@ -6442,7 +6442,7 @@ function generateServiceAgreement(id) {
     +'</ol></div></div>'
 
     +'<div class="sig-grid">'
-    +'<div class="sig-box"><div class="sig-line"></div><div style="font-weight:700">'+(b.name||'Client Name')+'</div><div class="sig-label">CLIENT — Signature over Printed Name</div></div>'
+    +'<div class="sig-box"><div class="sig-line"></div><div style="font-weight:700">'+escH(b.name||'Client Name')+'</div><div class="sig-label">CLIENT — Signature over Printed Name</div></div>'
     +'<div class="sig-box"><div class="sig-line"></div><div style="font-weight:700">DJ-CE Air-conditioning Services</div><div class="sig-label">SERVICE PROVIDER — Authorized Representative</div></div>'
     +'</div>'
 
@@ -6492,31 +6492,31 @@ function generateQuotationPDF(id) {
     <div style="margin-bottom:14px">
       <div class="sec-divider" style="margin-bottom:10px">👤 Customer Info</div>
       <div style="${rowStyle}">
-        <div><div style="${labelStyle}">Client Name</div><input id="qt_name" style="${fieldStyle}" value="${(b.name||'').replace(/"/g,'&quot;')}"></div>
-        <div><div style="${labelStyle}">Contact No.</div><input id="qt_phone" style="${fieldStyle}" value="${(b.phone||'').replace(/"/g,'&quot;')}"></div>
+        <div><div style="${labelStyle}">Client Name</div><input id="qt_name" style="${fieldStyle}" value="${escH(b.name||'')}"></div>
+        <div><div style="${labelStyle}">Contact No.</div><input id="qt_phone" style="${fieldStyle}" value="${escH(b.phone||'')}"></div>
       </div>
-      <div style="margin-bottom:8px"><div style="${labelStyle}">Address</div><input id="qt_address" style="${fieldStyle}" value="${(b.address||'').replace(/"/g,'&quot;')}"></div>
+      <div style="margin-bottom:8px"><div style="${labelStyle}">Address</div><input id="qt_address" style="${fieldStyle}" value="${escH(b.address||'')}"></div>
       <div style="${rowStyle}">
-        <div><div style="${labelStyle}">Landmark</div><input id="qt_landmark" style="${fieldStyle}" value="${(b.landmark||'').replace(/"/g,'&quot;')}"></div>
+        <div><div style="${labelStyle}">Landmark</div><input id="qt_landmark" style="${fieldStyle}" value="${escH(b.landmark||'')}"></div>
         <div><div style="${labelStyle}">Pin Location (Lat, Lng)</div><input id="qt_pin" style="${fieldStyle}" value="${b.lat&&b.lng?b.lat+', '+b.lng:''}"></div>
       </div>
     </div>
     <div style="margin-bottom:14px">
       <div class="sec-divider" style="margin-bottom:10px">🔧 Service & Unit Details</div>
-      <div style="margin-bottom:8px"><div style="${labelStyle}">Service</div><input id="qt_service" style="${fieldStyle}" value="${(b.service||'').replace(/"/g,'&quot;')}"></div>
+      <div style="margin-bottom:8px"><div style="${labelStyle}">Service</div><input id="qt_service" style="${fieldStyle}" value="${escH(b.service||'')}"></div>
       <div style="${rowStyle}">
         <div><div style="${labelStyle}">Unit Type</div><input id="qt_unitType" style="${fieldStyle}" value="${unitTypeVal}"></div>
-        <div><div style="${labelStyle}">Brand</div><input id="qt_brand" style="${fieldStyle}" value="${detParts[1]||''}"></div>
+        <div><div style="${labelStyle}">Brand</div><input id="qt_brand" style="${fieldStyle}" value="${escH(detParts[1]||'')}"></div>
       </div>
       <div style="${rowStyle}">
-        <div><div style="${labelStyle}">${isWM?'Capacity (kg)':'HP (Horsepower)'}</div><input id="qt_hp" style="${fieldStyle}" value="${detParts[0]||''}"></div>
+        <div><div style="${labelStyle}">${isWM?'Capacity (kg)':'HP (Horsepower)'}</div><input id="qt_hp" style="${fieldStyle}" value="${escH(detParts[0]||'')}"></div>
         <div><div style="${labelStyle}">Model</div><input id="qt_model" style="${fieldStyle}" value=""></div>
       </div>
       <div style="${rowStyle}">
         <div><div style="${labelStyle}">Last Cleaning</div><input id="qt_lastClean" style="${fieldStyle}" value=""></div>
         <div><div style="${labelStyle}">Quantity</div><input id="qt_qty" style="${fieldStyle}" value=""></div>
       </div>
-      <div style="margin-bottom:8px"><div style="${labelStyle}">Sira / Reklamo ng Unit</div><input id="qt_issue" style="${fieldStyle}" value="${(!isAC&&!isWM?det:'').replace(/"/g,'&quot;')}"></div>
+      <div style="margin-bottom:8px"><div style="${labelStyle}">Sira / Reklamo ng Unit</div><input id="qt_issue" style="${fieldStyle}" value="${escH(!isAC&&!isWM?det:'')}"></div>
       <div style="margin-bottom:8px"><div style="${labelStyle}">Location ng Unit</div><input id="qt_location" style="${fieldStyle}" value=""></div>
     </div>
     <div style="margin-bottom:14px">
@@ -7251,10 +7251,10 @@ function buildRevenueContent(from, to) {
       var fundBadge = e.fundingSource==='Investor' ? '<span class="bc-tag" style="background:color-mix(in srgb,var(--success) 15%,transparent);color:var(--success);font-size:10px;margin-left:4px">💼 Investor</span>' : '';
       return '<tr>'
         +'<td style="font-size:12px">'+formatDate(e.date)+'</td>'
-        +'<td><span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">'+e.category+'</span>'+fundBadge+'</td>'
-        +'<td style="font-size:12px">'+(e.description||'—')+(e.relatedJobId?'<div style="font-size:10px;color:var(--accent)">🔗 '+e.relatedJobId.split(',').join(', ')+'</div>':'')+'</td>'
+        +'<td><span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">'+escH(e.category)+'</span>'+fundBadge+'</td>'
+        +'<td style="font-size:12px">'+escH(e.description||'—')+(e.relatedJobId?'<div style="font-size:10px;color:var(--accent)">🔗 '+escH(e.relatedJobId.split(',').join(', '))+'</div>':'')+'</td>'
         +'<td style="font-weight:700;color:var(--danger)">₱'+parseFloat(e.amount||0).toLocaleString()+'</td>'
-        +'<td style="font-size:11.5px;color:var(--text-dim)">'+(e.addedBy||'—')+'</td>'
+        +'<td style="font-size:11.5px;color:var(--text-dim)">'+escH(e.addedBy||'—')+'</td>'
         +'<td><button class="btn btn-outline btn-xs" onclick="openAddExpense(\''+e.id+'\')" style="margin-right:4px">✏️</button><button class="btn btn-danger btn-xs" onclick="deleteExpense(\''+e.id+'\')">🗑️</button></td>'
         +'</tr>';
     }).join('');
@@ -7269,8 +7269,8 @@ function buildRevenueContent(from, to) {
     const rows = doneBks.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(function(b){
       return '<tr>'
         +'<td style="font-family:monospace;font-size:11px;color:var(--accent)">'+b.id+'</td>'
-        +'<td><strong>'+b.name+'</strong></td>'
-        +'<td style="font-size:12px">'+b.service+'</td>'
+        +'<td><strong>'+escH(b.name)+'</strong></td>'
+        +'<td style="font-size:12px">'+escH(b.service)+'</td>'
         +'<td style="font-size:12px">'+formatDate(b.date)+'</td>'
         +'<td style="font-size:12px">'+(techDisplay(b.technician)||'—')+'</td>'
         +'<td style="font-weight:700;color:var(--accent)">₱'+parseFloat(b.amount||0).toLocaleString()+'</td>'
@@ -7384,13 +7384,13 @@ function openAddExpense(editId) {
             var checked = e && ((e.relatedJobIds && e.relatedJobIds.indexOf(b.id)!==-1) || e.relatedJobId===b.id);
             return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;padding:6px 8px;cursor:pointer;border-radius:6px;border:1px solid '+(checked?'var(--accent)':'transparent')+';background:'+(checked?'var(--accent-soft)':'transparent')+';margin-bottom:4px;transition:all .15s" onmouseover="this.style.background=\'var(--bg-elev3)\'" onmouseout="this.style.background=this.querySelector(\'input\').checked?\'var(--accent-soft)\':\'transparent\'">'
             +'<input type="checkbox" class="exp_job_cb" value="'+b.id+'" '+(checked?'checked':'')+' style="width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex-shrink:0">'
-            +'<span>'+b.id+' — '+(b.service||'?')+' <span style="color:var(--text-dim)">('+(b.client||b.name||'?')+')</span></span></label>';
+            +'<span>'+escH(b.id)+' — '+escH(b.service||'?')+' <span style="color:var(--text-dim)">('+escH(b.client||b.name||'?')+')</span></span></label>';
           }).join('') : '<div style="font-size:12px;color:var(--text-dim);padding:8px">No jobs yet</div>'}
         </div>
       </div>
-      <div class="field form-full"><label>Description</label><input id="exp_desc" value="${e?e.description||'':''}" placeholder="e.g. Shell station - Bocaue run"></div>
+      <div class="field form-full"><label>Description</label><input id="exp_desc" value="${escH(e?e.description||'':'')}" placeholder="e.g. Shell station - Bocaue run"></div>
       <div class="field"><label>Amount (₱) *</label><input type="number" id="exp_amt" value="${e?e.amount||'':''}" placeholder="0.00" min="0" step="0.01"></div>
-      <div class="field"><label>Receipt / Ref No.</label><input id="exp_ref" value="${e?e.ref||'':''}" placeholder="Optional receipt number"></div>
+      <div class="field"><label>Receipt / Ref No.</label><input id="exp_ref" value="${escH(e?e.ref||'':'')}" placeholder="Optional receipt number"></div>
     </div>`;
   document.getElementById('expModalFoot').innerHTML = `
     <button class="btn btn-outline btn-sm" onclick="closeModal('expenseModal')">Cancel</button>
@@ -7837,8 +7837,8 @@ function openPayslip(empId) {
   document.getElementById('psTitle').textContent = `Payslip — ${emp.name}`;
   document.getElementById('psBody').innerHTML = `
     <div class="form-grid">
-      <div class="field"><label>Name</label><input id="ps_name" value="${emp.name}"></div>
-      <div class="field"><label>Role</label><input id="ps_role" value="${emp.role||''}" readonly></div>
+      <div class="field"><label>Name</label><input id="ps_name" value="${escH(emp.name)}"></div>
+      <div class="field"><label>Role</label><input id="ps_role" value="${escH(emp.role||'')}" readonly></div>
       <div class="field"><label>Period From</label><input type="date" id="ps_from" value="${periodStart}" onchange="previewPayslip()"></div>
       <div class="field"><label>Period To</label><input type="date" id="ps_to" value="${periodEnd}" onchange="previewPayslip()"></div>
       <div class="field"><label>Days Worked</label><input type="number" id="ps_days" value="${defaultDays}" min="0" oninput="previewPayslip()"></div>
@@ -8174,8 +8174,8 @@ function buildReportsContent(ym) {
     const rows = mExp.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(function(e){
       return '<tr>'
         +'<td style="font-size:12px">'+formatDate(e.date)+'</td>'
-        +'<td><span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">'+e.category+'</span></td>'
-        +'<td style="font-size:12px">'+(e.description||'—')+'</td>'
+        +'<td><span class="bc-tag" style="background:var(--danger-soft);color:var(--danger)">'+escH(e.category)+'</span></td>'
+        +'<td style="font-size:12px">'+escH(e.description||'—')+'</td>'
         +'<td style="color:var(--danger);font-weight:700">₱'+parseFloat(e.amount||0).toLocaleString()+'</td>'
         +'</tr>';
     }).join('');
@@ -8899,17 +8899,17 @@ function renderAcctEmployees() {
       +ACCT_EMPLOYEES.map(function(e){
         return '<div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:14px">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-          +'<div><div style="font-weight:700;font-size:14px">'+e.name+'</div>'
-          +'<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">'+e.role+'</div></div>'
-          +'<span class="bc-tag" style="background:color-mix(in srgb,'+(typeColors[e.type]||'var(--text-dim)')+' 15%,transparent);color:'+(typeColors[e.type]||'var(--text-dim)')+'">'+e.type+'</span>'
+          +'<div><div style="font-weight:700;font-size:14px">'+escH(e.name)+'</div>'
+          +'<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px">'+escH(e.role)+'</div></div>'
+          +'<span class="bc-tag" style="background:color-mix(in srgb,'+(typeColors[e.type]||'var(--text-dim)')+' 15%,transparent);color:'+(typeColors[e.type]||'var(--text-dim)')+'">'+escH(e.type)+'</span>'
           +'</div>'
           +'<div style="margin-top:10px;font-size:12px;display:flex;flex-wrap:wrap;gap:12px;color:var(--text-dim)">'
           +'<span>💰 ₱'+(parseFloat(e.dailyRate)||0).toLocaleString()+'/day</span>'
           +(e.mealAllowance?'<span>🍽️ ₱'+(parseFloat(e.mealAllowance)||0).toLocaleString()+' meal</span>':'')
-          +(e.accountUsername?'<span>🔗 '+e.accountUsername+'</span>':'')
-          +(e.notes?'<span>📝 '+e.notes+'</span>':'')
+          +(e.accountUsername?'<span>🔗 '+escH(e.accountUsername)+'</span>':'')
+          +(e.notes?'<span>📝 '+escH(e.notes)+'</span>':'')
           +'</div>'
-          +(e.bankName?'<div style="margin-top:8px;font-size:11.5px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:8px">🏦 '+e.bankName+(e.accountNo?' · ****'+e.accountNo.slice(-4):'')+(e.accountName?' · '+e.accountName:'')+'</div>':'')
+          +(e.bankName?'<div style="margin-top:8px;font-size:11.5px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:8px">🏦 '+escH(e.bankName)+(e.accountNo?' · ****'+escH(e.accountNo.slice(-4)):'')+(e.accountName?' · '+escH(e.accountName):'')+'</div>':'')
           +'<div style="margin-top:10px;display:flex;gap:6px">'
           +'<button class="btn btn-outline btn-xs" onclick="openEditEmployee(\''+e.id+'\')">✏️ Edit</button>'
           +'<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="deleteEmployee(\''+e.id+'\')">🗑️</button>'
@@ -8955,7 +8955,7 @@ function openEditEmployee(editId) {
     +'<div class="field"><label>Linked Portal Account</label><select id="emp_username"><option value="">— None —</option>'
     +Object.keys(USERS).map(function(u){var usr=USERS[u];return '<option value="'+u+'" '+(e&&e.accountUsername===u?'selected':'')+'>'+u+' ('+usr.name+' — '+usr.role+')</option>';}).join('')
     +'</select></div>'
-    +'<div class="field form-full"><label>Notes</label><input id="emp_notes" value="'+(e?e.notes||'':'')+'" placeholder="e.g. Saturdays only, family"></div>'
+    +'<div class="field form-full"><label>Notes</label><input id="emp_notes" value="'+escH(e?e.notes||'':'')+'" placeholder="e.g. Saturdays only, family"></div>'
     +'<div class="field form-full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="font-weight:700;color:var(--accent)">🏦 Bank / ATM Details</label></div>'
     +'<div class="field"><label>Bank Name</label><input id="emp_bank" value="'+(e?e.bankName||'':'')+'" placeholder="e.g. BDO, BPI, GCash"></div>'
     +'<div class="field"><label>Account Number</label><input id="emp_acctno" value="'+(e?e.accountNo||'':'')+'" placeholder="Account / Card number"></div>'
@@ -9063,10 +9063,10 @@ function renderAcctDaily() {
       return '<option value="'+c+'" '+(cls===c?'selected':'')+'>'+(c||'— None —')+'</option>';
     }).join('');
     return '<tr>'
-      +'<td><strong>'+emp.name+'</strong><div style="font-size:10.5px;color:var(--text-dim)">'+emp.role+' · ₱'+(parseFloat(emp.dailyRate)||0).toLocaleString()+'/day</div></td>'
+      +'<td><strong>'+escH(emp.name)+'</strong><div style="font-size:10.5px;color:var(--text-dim)">'+escH(emp.role)+' · ₱'+(parseFloat(emp.dailyRate)||0).toLocaleString()+'/day</div></td>'
       +'<td style="text-align:center;font-weight:700;color:var(--accent)">'+auto.jobs+'</td>'
       +'<td><select data-emp-id="'+emp.id+'" class="acct-cls-sel" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">'+clsOptions+'</select></td>'
-      +'<td><input data-emp-id-note="'+emp.id+'" class="acct-cls-note" value="'+(existing?existing.notes||'':'')+'" placeholder="Audit notes..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:100%"></td>'
+      +'<td><input data-emp-id-note="'+emp.id+'" class="acct-cls-note" value="'+escH(existing?existing.notes||'':'')+'" placeholder="Audit notes..." style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:100%"></td>'
       +'<td style="text-align:center">'+(existing?'<span style="color:var(--success);font-size:11px">✅ Saved</span>':'<span style="color:var(--text-dim);font-size:11px">—</span>')+'</td>'
       +'</tr>';
   }).join('');
@@ -9518,8 +9518,8 @@ function openPayslipAcct(empId, pFrom, pTo) {
       <div style="font-size:12px;margin-top:4px;font-weight:600">${periodLabel}</div>
     </div>
     <div class="form-grid">
-      <div class="field"><label>Employee Name</label><input id="ps_name" value="${emp.name}"></div>
-      <div class="field"><label>Role</label><input id="ps_role" value="${emp.role}"></div>
+      <div class="field"><label>Employee Name</label><input id="ps_name" value="${escH(emp.name)}"></div>
+      <div class="field"><label>Role</label><input id="ps_role" value="${escH(emp.role)}"></div>
       <div class="field"><label>Daily Rate</label><input id="ps_rate" type="number" value="${rate}"></div>
       <div class="field"><label>Meal Allowance/day</label><input id="ps_meal" type="number" value="${meal}"></div>
       <div class="field"><label>Half Days (×0.5)</label><input id="ps_half" type="number" value="${halfDays}"></div>
@@ -9623,7 +9623,7 @@ function renderAcctInvestors() {
           +'<div style="margin-top:10px;font-size:12px;color:var(--text-dim)">'
           +'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Annual Share:</span><strong style="color:var(--success)">₱'+share.toLocaleString()+'</strong></div>'
           +'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Monthly Ipon:</span><strong>₱'+monthlyIpon.toLocaleString()+'</strong></div>'
-          +(inv.notes?'<div style="margin-top:6px;font-size:11px">📝 '+inv.notes+'</div>':'')
+          +(inv.notes?'<div style="margin-top:6px;font-size:11px">📝 '+escH(inv.notes)+'</div>':'')
           +'</div>'
           +'<div style="margin-top:10px;display:flex;gap:6px">'
           +'<button class="btn btn-outline btn-xs" onclick="openEditInvestor(\''+inv.id+'\')">✏️ Edit</button>'
@@ -9656,7 +9656,7 @@ function renderAcctInvestors() {
     depositHtml = '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Investor</th><th>Description</th><th>Method</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>'
       +INVESTOR_DEPOSITS.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(d){
         var inv = ACCT_INVESTORS.find(function(i){return i.id===d.investorId;});
-        return '<tr><td>'+formatDate(d.date)+'</td><td>'+(inv?inv.name:d.investorId)+'</td><td>'+(d.description||'—')+'</td><td>'+(d.method||'Cash')+'</td>'
+        return '<tr><td>'+formatDate(d.date)+'</td><td>'+escH(inv?inv.name:d.investorId)+'</td><td>'+escH(d.description||'—')+'</td><td>'+escH(d.method||'Cash')+'</td>'
           +'<td style="text-align:right;font-weight:700;color:var(--success)">₱'+(parseFloat(d.amount)||0).toLocaleString()+'</td>'
           +'<td><button class="btn btn-danger btn-xs" onclick="deleteDeposit(\''+d.id+'\')">🗑️</button></td></tr>';
       }).join('')+'</tbody></table></div>';
@@ -9936,7 +9936,7 @@ function openEditInvestor(editId) {
   var html = '<div class="form-grid">'
     +'<div class="field"><label>Investor Name *</label><input id="inv_name" value="'+(inv?inv.name:'')+'" placeholder="e.g. Investor 1"></div>'
     +'<div class="field"><label>Share Percentage (%) *</label><input type="number" id="inv_pct" value="'+(inv?inv.percentage||'':'')+'" placeholder="e.g. 30" min="0" max="100" step="0.5"></div>'
-    +'<div class="field form-full"><label>Notes</label><input id="inv_notes" value="'+(inv?inv.notes||'':'')+'" placeholder="Optional notes"></div>'
+    +'<div class="field form-full"><label>Notes</label><input id="inv_notes" value="'+escH(inv?inv.notes||'':'')+'" placeholder="Optional notes"></div>'
     +'</div>';
   document.getElementById('expModalTitle').textContent = inv ? 'Edit Investor' : 'Add Investor';
   document.getElementById('expModalBody').innerHTML = html;
@@ -11205,8 +11205,8 @@ function renderTrash() {
           const urgentColor = daysLeft<=3?'var(--danger)':daysLeft<=7?'var(--warning)':'var(--text-dim)';
           return `<tr>
             <td style="font-family:monospace;font-size:11px;color:var(--accent)">${b.id}</td>
-            <td><strong>${b.name||'—'}</strong><div style="font-size:10.5px;color:var(--text-dim)">${b.phone||''}</div></td>
-            <td style="font-size:12px;max-width:140px">${b.service||'—'}</td>
+            <td><strong>${escH(b.name||'—')}</strong><div style="font-size:10.5px;color:var(--text-dim)">${escH(b.phone||'')}</div></td>
+            <td style="font-size:12px;max-width:140px">${escH(b.service||'—')}</td>
             <td style="font-size:12px">${formatDate(b.date)}</td>
             <td style="font-size:12px">${b.deletedBy||'—'}</td>
             <td style="font-size:11.5px;color:var(--text-dim)">${b.deletedAt?formatTimeAgo(b.deletedAt):'—'}</td>
@@ -11261,7 +11261,7 @@ function renderArchive() {
       </div>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Booking ID</th><th>Client</th><th>Service</th><th>Date</th><th>Amount</th><th>Archived By</th><th>Archived</th><th>Actions</th></tr></thead>
-        <tbody>${archived.map(function(b){return '<tr><td style="font-family:monospace;font-size:11px;color:var(--accent)">'+b.id+'</td><td><strong>'+(b.name||'—')+'</strong><div style="font-size:10.5px;color:var(--text-dim)">'+(b.phone||'')+'</div></td><td style="font-size:12px;max-width:140px">'+(b.service||'—')+'</td><td style="font-size:12px">'+formatDate(b.date)+'</td><td style="font-size:12px;color:var(--accent)">'+(b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—')+'</td><td style="font-size:12px">'+(b.archivedBy||'—')+'</td><td style="font-size:11.5px;color:var(--text-dim)">'+(b.archivedAt?formatTimeAgo(b.archivedAt):'—')+'</td><td><button class="btn btn-success btn-xs" data-bid="'+b.id+'" onclick="restoreFromArchive(this.dataset.bid)">♻️ Restore</button></td></tr>';}).join('')}</tbody>
+        <tbody>${archived.map(function(b){return '<tr><td style="font-family:monospace;font-size:11px;color:var(--accent)">'+b.id+'</td><td><strong>'+escH(b.name||'—')+'</strong><div style="font-size:10.5px;color:var(--text-dim)">'+escH(b.phone||'')+'</div></td><td style="font-size:12px;max-width:140px">'+escH(b.service||'—')+'</td><td style="font-size:12px">'+formatDate(b.date)+'</td><td style="font-size:12px;color:var(--accent)">'+(b.amount?'₱'+parseFloat(b.amount).toLocaleString():'—')+'</td><td style="font-size:12px">'+(b.archivedBy||'—')+'</td><td style="font-size:11.5px;color:var(--text-dim)">'+(b.archivedAt?formatTimeAgo(b.archivedAt):'—')+'</td><td><button class="btn btn-success btn-xs" data-bid="'+b.id+'" onclick="restoreFromArchive(this.dataset.bid)">♻️ Restore</button></td></tr>';}).join('')}</tbody>
       </table></div>
     </div>
   </div>`;
@@ -12007,8 +12007,8 @@ function confirm2(title, msg, icon, onConfirm) {
   const el = document.createElement('div');
   el.className='confirm-overlay';
   el.innerHTML=`<div class="confirm-box">
-    <div class="confirm-icon">${icon}</div>
-    <div class="confirm-title">${title}</div>
+    <div class="confirm-icon">${escH(icon)}</div>
+    <div class="confirm-title">${escH(title)}</div>
     <div class="confirm-msg">${msg}</div>
     <div class="confirm-btns">
       <button class="btn btn-outline" onclick="this.closest('.confirm-overlay').remove()">Cancel</button>
@@ -12027,7 +12027,7 @@ function showToast(msg, type='info', duration=3500) {
   const icons={success:'✅',error:'❌',info:'ℹ️',warning:'⚠️'};
   const t=document.createElement('div');
   t.className=`toast ${type}`;
-  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${escH(msg)}</span>`;
   document.getElementById('toastContainer').appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(100%)'; t.style.transition='all 0.3s'; setTimeout(()=>t.remove(),300); },duration);
 }
@@ -12215,9 +12215,9 @@ function renderFollowup(){
       const over=new Date(c.nextCleaningDate)<new Date();
       return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '+(over?'var(--danger)':'var(--warning)')+';border-radius:8px;padding:13px;margin-bottom:8px">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'+
-        '<div><strong style="font-size:14px">'+c.name+'</strong>'+
-        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">📞 '+(c.phone||'—')+' · 📍 '+(c.address||'—')+'</div>'+
-        '<div style="font-size:11px;color:var(--text-dim)">Last: <strong>'+(c.lastService||'—')+'</strong> on '+formatDate(c.lastServiceDate)+'</div>'+
+        '<div><strong style="font-size:14px">'+escH(c.name)+'</strong>'+
+        '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">📞 '+escH(c.phone||'—')+' · 📍 '+escH(c.address||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--text-dim)">Last: <strong>'+escH(c.lastService||'—')+'</strong> on '+formatDate(c.lastServiceDate)+'</div>'+
         '<div style="font-size:11px;color:var(--text-dim)">Frequency: '+(c.usage||'Not set')+'</div></div>'+
         '<div style="text-align:right">'+
         '<span class="status-badge '+(over?'s-cancelled':'s-pending')+'">'+(over?'OVERDUE':'DUE '+formatDate(c.nextCleaningDate))+'</span>'+
@@ -12233,7 +12233,7 @@ function renderFollowup(){
       fu.map(function(b){
         return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid var(--info);border-radius:8px;padding:13px;margin-bottom:8px">'+
           '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
-          '<div><strong>'+b.name+'</strong><div style="font-size:11px;color:var(--text-dim)">📞 '+(b.phone||'—')+' · '+b.service+'</div>'+
+          '<div><strong>'+escH(b.name)+'</strong><div style="font-size:11px;color:var(--text-dim)">📞 '+escH(b.phone||'—')+' · '+escH(b.service)+'</div>'+
           '<div style="font-size:11px;color:var(--text-dim)">Completed: '+formatDate((b.completedAt||b.date).split('T')[0])+'</div></div>'+
           '<div style="display:flex;gap:5px">'+
           (b.phone?'<a href="tel:'+b.phone+'" class="btn btn-success btn-xs">📞 Call</a>':'')+
@@ -12408,8 +12408,8 @@ function checkDuplicateClient() {
   alert.innerHTML='<div style="font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ Possible existing client'+(matches.length>1?'s':'')+':</div>'+
     matches.slice(0,3).map(function(c){
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
-        +'<div><strong>'+escH(c.name)+'</strong> · '+(c.phone||'—')
-        +'<div style="font-size:11px;color:var(--text-dim)">'+(c.lastService||'No service yet')+' · '+(c.lastServiceDate?formatDate(c.lastServiceDate):'No date')+'</div></div>'
+        +'<div><strong>'+escH(c.name)+'</strong> · '+escH(c.phone||'—')
+        +'<div style="font-size:11px;color:var(--text-dim)">'+escH(c.lastService||'No service yet')+' · '+(c.lastServiceDate?formatDate(c.lastServiceDate):'No date')+'</div></div>'
         +'<button class="btn btn-primary btn-xs" onclick="closeModal(\'editModal\');openClientModal(\''+(c.phone||c.name)+'\')">View</button>'
         +'</div>';
     }).join('');
@@ -13436,8 +13436,8 @@ function buildAccRows(){
         +'<button class="btn btn-outline btn-xs" data-acc-resetpin="'+u.username+'" title="'+(hasPinSet?'PIN is set — click to reset':'No PIN set')+'">'+(hasPinSet?'🔒':'🔓')+' Reset PIN</button>'
         +(!isOwnerAcc ? ' <button class="btn btn-danger btn-xs" data-acc-del="'+u.username+'">Remove</button>' : '');
     return '<tr>'
-      +'<td style="font-family:monospace;font-size:12px;color:var(--accent)">@'+u.username+'</td>'
-      +'<td><strong>'+u.name+'</strong></td>'
+      +'<td style="font-family:monospace;font-size:12px;color:var(--accent)">@'+escH(u.username)+'</td>'
+      +'<td><strong>'+escH(u.name)+'</strong></td>'
       +'<td>'+roleBadge+'</td>'
       +'<td style="font-size:12px">'+(lc?formatDate(u.lastPwChange.split('T')[0]):'<span style="color:var(--danger)">Never</span>')+'</td>'
       +'<td>'+badge+'</td>'
@@ -13455,9 +13455,9 @@ function openEditAccount(username){
   var currentPerms = u.permissions && Array.isArray(u.permissions) ? u.permissions : getDefaultPerms(u.role);
   document.getElementById('emBody').innerHTML = '<div class="form-grid">'
     +'<div class="field"><label>Username'+(isOwner?' (locked)':'')+'</label>'
-    +'<input id="ea_user" value="'+u.username+'" placeholder="lowercase only"'+(isOwner?' readonly style="opacity:.7;background:var(--bg-elev2)"':'')+'></div>'
+    +'<input id="ea_user" value="'+escH(u.username)+'" placeholder="lowercase only"'+(isOwner?' readonly style="opacity:.7;background:var(--bg-elev2)"':'')+'></div>'
     +'<div class="field"><label>Display Name</label>'
-    +'<input id="ea_name" value="'+u.name+'" placeholder="Full name"></div>'
+    +'<input id="ea_name" value="'+escH(u.name)+'" placeholder="Full name"></div>'
     +'<div class="field"><label>Role'+(isOwner?' (locked)':'')+'</label>'
     +'<select id="ea_role"'+(isOwner?' disabled':'')+' onchange="document.getElementById(\'ac_perms_area\').innerHTML=buildPermissionToggles(this.value);updatePermToggleStyles()">'+
     (isOwner?'<option value="owner" selected>Owner</option>':'')+
@@ -13545,7 +13545,7 @@ function applySettingsAvatar() {
   if (!el) return;
   var pic = getProfilePic(session.username);
   if (pic && pic.type === 'photo') {
-    el.innerHTML = '<img src="'+pic.data+'" alt="'+session.name+'" style="width:100%;height:100%;object-fit:cover">';
+    el.innerHTML = '<img src="'+pic.data+'" alt="'+escH(session.name)+'" style="width:100%;height:100%;object-fit:cover">';
   } else if (pic && pic.type === 'avatar') {
     el.innerHTML = '';
     el.textContent = pic.emoji;
@@ -13802,7 +13802,7 @@ function applyProfilePic() {
   var avatarEl = document.getElementById('userAvatar');
   if (!avatarEl) return;
   if (pic && pic.type === 'photo') {
-    avatarEl.innerHTML = '<img src="'+pic.data+'" alt="'+session.name+'">';
+    avatarEl.innerHTML = '<img src="'+pic.data+'" alt="'+escH(session.name)+'">';
   } else if (pic && pic.type === 'avatar') {
     avatarEl.innerHTML = '';
     avatarEl.textContent = pic.emoji;
