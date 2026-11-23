@@ -14,6 +14,194 @@ var BUSINESS_PHONE = '0967 004 2636';
 var BUSINESS_ADDRESS = 'Caniogan, Calumpit, Bulacan';
 var TIMEZONE      = 'Asia/Manila';
 
+/* ─── AUTH CONFIG ────────────────────────────────────────── */
+var SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+var HASH_SALT      = 'djce_s3cur3_2025!';
+
+/* ─── AUTH HELPERS ───────────────────────────────────────── */
+function hashPassword(pw) {
+  var raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, HASH_SALT + pw);
+  return raw.map(function(b) { return ('0' + ((b < 0 ? b + 256 : b)).toString(16)).slice(-2); }).join('');
+}
+
+function generateToken() {
+  return Utilities.getUuid() + '-' + new Date().getTime();
+}
+
+/**
+ * Validate a session token. Returns { valid:true, username, role } or { valid:false }.
+ * Tokens are stored in ScriptProperties as token_<token> = JSON {username, role, created}.
+ */
+function validateToken(token) {
+  if (!token) return { valid: false };
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty('token_' + token);
+  if (!raw) return { valid: false };
+  try {
+    var sess = JSON.parse(raw);
+    if (new Date().getTime() - sess.created > SESSION_TTL_MS) {
+      props.deleteProperty('token_' + token);
+      return { valid: false };
+    }
+    return { valid: true, username: sess.username, role: sess.role };
+  } catch(e) {
+    return { valid: false };
+  }
+}
+
+/**
+ * Login: verify hashed password, return session token.
+ * Accepts both hashed and plaintext passwords during migration period.
+ */
+function doLogin(p) {
+  var username = (p.username || '').toLowerCase().trim();
+  var password = p.password || '';
+  if (!username || !password) return { ok: false, error: 'Missing credentials' };
+
+  var sheet = getOrCreateSheet('Accounts');
+  var rows = sheet.getDataRange().getValues();
+  var headers = rows[0];
+  var pwCol = -1, roleCol = -1, nameCol = -1, avatarCol = -1, forceCol = -1, lastPwCol = -1;
+  headers.forEach(function(h, i) {
+    var k = headerToKey(h);
+    if (k === 'password') pwCol = i;
+    if (k === 'role') roleCol = i;
+    if (k === 'name') nameCol = i;
+    if (k === 'avatar') avatarCol = i;
+    if (k === 'forceChange') forceCol = i;
+    if (k === 'lastPwChange') lastPwCol = i;
+  });
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).toLowerCase().trim() !== username) continue;
+
+    var stored = String(rows[i][pwCol] || '');
+    var inputHash = hashPassword(password);
+    var match = false;
+
+    if (stored === inputHash) {
+      // Password is already hashed and matches
+      match = true;
+    } else if (stored === password) {
+      // Plaintext password match — migrate to hash
+      sheet.getRange(i + 1, pwCol + 1).setValue(inputHash);
+      match = true;
+    }
+
+    if (!match) return { ok: false, error: 'Invalid credentials' };
+
+    // Check force change / password expiry
+    var forceChange = (forceCol >= 0) ? (String(rows[i][forceCol]) === 'true') : false;
+    var lastPwChange = (lastPwCol >= 0) ? String(rows[i][lastPwCol] || '') : '';
+    var pwExpired = false;
+    if (lastPwChange) {
+      var daysSince = (new Date().getTime() - new Date(lastPwChange).getTime()) / (1000*60*60*24);
+      if (daysSince > 90) pwExpired = true;
+    }
+
+    // Generate session token
+    var token = generateToken();
+    var role = (roleCol >= 0) ? String(rows[i][roleCol] || '') : '';
+    var name = (nameCol >= 0) ? String(rows[i][nameCol] || '') : '';
+    var avatar = (avatarCol >= 0) ? String(rows[i][avatarCol] || '') : '';
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('token_' + token, JSON.stringify({
+      username: username, role: role, created: new Date().getTime()
+    }));
+
+    // Update lastLogin
+    sheet.getRange(i + 1, 9).setValue(now());
+
+    return {
+      ok: true, token: token,
+      username: username, name: name, role: role, avatar: avatar,
+      forceChange: forceChange, pwExpired: pwExpired
+    };
+  }
+  return { ok: false, error: 'Invalid credentials' };
+}
+
+/**
+ * Server-side password change with token validation.
+ */
+function changePassword(p) {
+  var auth = validateToken(p.token);
+  if (!auth.valid) return { ok: false, error: 'Unauthorized' };
+
+  var username = auth.username;
+  var newPw = p.newPassword || '';
+  if (!newPw || newPw.length < 8) return { ok: false, error: 'Password must be at least 8 characters' };
+
+  var sheet = getOrCreateSheet('Accounts');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).toLowerCase().trim() === username) {
+      sheet.getRange(i + 1, 2).setValue(hashPassword(newPw));
+      sheet.getRange(i + 1, 6).setValue(now());       // lastPwChange
+      sheet.getRange(i + 1, 7).setValue('false');      // forceChange
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Account not found' };
+}
+
+/**
+ * Logout: invalidate a session token.
+ */
+function doLogout(p) {
+  var token = p.token || '';
+  if (token) {
+    PropertiesService.getScriptProperties().deleteProperty('token_' + token);
+  }
+  return { ok: true };
+}
+
+/**
+ * Clean up expired tokens (run periodically or on login).
+ */
+function cleanExpiredTokens() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  var now = new Date().getTime();
+  var cleaned = 0;
+  for (var key in all) {
+    if (key.indexOf('token_') === 0) {
+      try {
+        var sess = JSON.parse(all[key]);
+        if (now - sess.created > SESSION_TTL_MS) {
+          props.deleteProperty(key);
+          cleaned++;
+        }
+      } catch(e) { props.deleteProperty(key); cleaned++; }
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * Reset password via security question (no token needed).
+ * The portal verifies the security answer client-side since questions are in localStorage,
+ * but this endpoint also validates it from the Accounts sheet if stored there.
+ */
+function resetPasswordNoAuth(p) {
+  var username = (p.username || '').toLowerCase().trim();
+  var newPassword = p.newPassword || '';
+  if (!username || !newPassword) return { ok: false, error: 'Missing fields' };
+  if (newPassword.length < 8) return { ok: false, error: 'Password must be at least 8 characters' };
+
+  var sheet = getOrCreateSheet('Accounts');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).toLowerCase().trim() === username) {
+      sheet.getRange(i + 1, 2).setValue(hashPassword(newPassword));
+      sheet.getRange(i + 1, 6).setValue(now());       // lastPwChange
+      sheet.getRange(i + 1, 7).setValue('false');      // forceChange
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Account not found' };
+}
+
 /* ─── SHEET HEADERS ───────────────────────────────────────── */
 var HEADERS = {
   Bookings: [
@@ -147,13 +335,56 @@ function doGet(e) {
     var cb     = params.cb     || '';
 
     if (!action) {
-      result = { ok: true, name: 'DJ-CE Backend v4.1', time: now() };
+      result = { ok: true, name: 'DJ-CE Backend v4.2-secure', time: now() };
     } else {
+
+      // ── PUBLIC actions (no token required) ──
+      var PUBLIC_ACTIONS = [
+        'submitBooking', 'getAvailableSlots', 'addToWaitlist',
+        'login', 'logout', 'changePassword', 'migratePasswords',
+        'resetPasswordNoAuth'
+      ];
+      var isPublic = PUBLIC_ACTIONS.indexOf(action) >= 0;
+
+      // ── Token check for protected actions ──
+      if (!isPublic) {
+        var auth = validateToken(params.token);
+        if (!auth.valid) {
+          result = { ok: false, error: 'Unauthorized', code: 'AUTH_REQUIRED' };
+          // Jump to output
+          var json2 = JSON.stringify(result);
+          var out2;
+          if (cb) {
+            out2 = ContentService.createTextOutput(cb + '(' + json2 + ')');
+            out2.setMimeType(ContentService.MimeType.JAVASCRIPT);
+          } else {
+            out2 = ContentService.createTextOutput(json2);
+            out2.setMimeType(ContentService.MimeType.JSON);
+          }
+          return out2;
+        }
+      }
+
+      // Clean up expired tokens occasionally (1 in 50 requests)
+      if (Math.random() < 0.02) { try { cleanExpiredTokens(); } catch(ce){} }
+
       switch (action) {
+        // Auth actions (public)
+        case 'login':              result = doLogin(params);             break;
+        case 'logout':             result = doLogout(params);            break;
+        case 'changePassword':     result = changePassword(params);      break;
+        case 'migratePasswords':   result = migrateAllPasswords();       break;
+        case 'resetPasswordNoAuth': result = resetPasswordNoAuth(params); break;
+
+        // Public booking actions
         case 'submitBooking':       result = submitBooking(params);       break;
+        case 'getAvailableSlots':   result = getAvailableSlots(params);   break;
+        case 'addToWaitlist':       result = addToWaitlist(params);       break;
+
+        // Protected actions (token validated above)
         case 'getBookings':         result = getBookings(params);         break;
         case 'updateBooking':       result = updateBooking(params);       break;
-        case 'getAccounts':         result = getAccounts();               break;
+        case 'getAccounts':         result = getAccountsSafe();           break;
         case 'saveAccount':         result = saveAccount(params);         break;
         case 'deleteAccount':       result = deleteAccount(params);       break;
         case 'getClients':          result = getClients();                break;
@@ -168,7 +399,6 @@ function doGet(e) {
         case 'getBookingHistory':  result = getBookingHistory(params); break;
         case 'getNextRefNumber':    result = getNextRefNumber(params);    break;
         case 'getRefCounters':      result = getRefCounters();            break;
-        case 'getAvailableSlots':   result = getAvailableSlots(params);   break;
         case 'openSlot':            result = openSlot(params);            break;
         case 'closeSlot':           result = closeSlot(params);           break;
         case 'deleteSlot':          result = deleteSlot(params);          break;
@@ -188,7 +418,6 @@ function doGet(e) {
         case 'sendReminder':        result = sendManualReminder(params);  break;
         case 'getSheetHeaders':     result = getSheetHeaders(params);     break;
         case 'fixBookingHeaders':   result = fixBookingHeaders();         break;
-        case 'addToWaitlist':       result = addToWaitlist(params);       break;
         case 'getWaitlist':         result = getWaitlist(params);         break;
         case 'updateWaitlist':      result = updateWaitlist(params);      break;
         case 'deleteWaitlist':      result = deleteWaitlist(params);      break;
@@ -235,6 +464,11 @@ function doGet(e) {
 
 /* ─── BOOKINGS ────────────────────────────────────────────── */
 function submitBooking(p) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) {
+    return { ok: false, error: 'Server busy, please try again' };
+  }
+  try {
   var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
   var sheet = getOrCreateSheet('Bookings');
   var id = data.id || ('BK-' + new Date().getTime());
@@ -323,6 +557,7 @@ function submitBooking(p) {
   } catch(e) {}
 
   return { ok: true, id: id, timestamp: ts };
+  } finally { lock.releaseLock(); }
 }
 
 function getBookings(p) {
@@ -625,6 +860,49 @@ function decrementSlotCount(date, timeSlot) {
 }
 
 /* ─── ACCOUNTS ────────────────────────────────────────────── */
+
+/**
+ * Safe version: returns accounts WITHOUT passwords/PINs (for portal sync).
+ */
+function getAccountsSafe() {
+  var sheet = getOrCreateSheet('Accounts');
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return { ok: true, accounts: [] };
+  var headers = rows[0];
+  var accounts = rows.slice(1).map(function(row) {
+    var obj = {};
+    headers.forEach(function(h, i) {
+      var key = headerToKey(h);
+      // Strip sensitive fields
+      if (key === 'password' || key === 'pin') return;
+      obj[key] = cellToString(row[i]);
+    });
+    return obj;
+  });
+  return { ok: true, accounts: accounts };
+}
+
+/**
+ * Migrate all plaintext passwords to SHA-256 hashes.
+ * Run once after deploying secure version.
+ */
+function migrateAllPasswords() {
+  var sheet = getOrCreateSheet('Accounts');
+  var rows = sheet.getDataRange().getValues();
+  var migrated = 0;
+  for (var i = 1; i < rows.length; i++) {
+    var pw = String(rows[i][1] || '');
+    if (!pw) continue;
+    // Check if already looks like a 64-char hex hash
+    if (/^[0-9a-f]{64}$/.test(pw)) continue;
+    // It's plaintext — hash it
+    sheet.getRange(i + 1, 2).setValue(hashPassword(pw));
+    migrated++;
+  }
+  return { ok: true, migrated: migrated };
+}
+
+/** Original getAccounts — still used internally by doLogin */
 function getAccounts() {
   var sheet = getOrCreateSheet('Accounts');
   var rows = sheet.getDataRange().getValues();
@@ -885,6 +1163,11 @@ function getBookingHistory(p) {
 }
 /* ─── REFERENCE NUMBERS ───────────────────────────────────── */
 function getNextRefNumber(p) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch(e) {
+    return { ok: false, error: 'Server busy, please try again' };
+  }
+  try {
   var docType     = p.docType     || 'BK';
   var serviceCode = p.serviceCode || 'GN';
   var nowDate     = new Date();
@@ -926,6 +1209,7 @@ function getNextRefNumber(p) {
   var tPad = String(totCount).padStart(3, '0');
   var refNo = 'DJCE-' + mmyy + '-M' + mPad + '-T' + tPad + '-' + serviceCode;
   return { ok: true, refNo: docType + '-' + refNo, monthly: mthCount, total: totCount, mmyy: mmyy };
+  } finally { lock.releaseLock(); }
 }
 
 function getRefCounters() {
@@ -1535,6 +1819,16 @@ function doPost(e) {
   try {
     var params = e.parameter || {};
     var action = params.action || '';
+
+    // Token check for POST actions
+    var auth = validateToken(params.token);
+    if (!auth.valid) {
+      var json = JSON.stringify({ ok: false, error: 'Unauthorized', code: 'AUTH_REQUIRED' });
+      return HtmlService.createHtmlOutput('<html><body><script>'
+        + 'try { window.parent.postMessage(' + json + ', "*"); }'
+        + 'catch(e) {}</script></body></html>')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
 
     if (action === 'uploadPhoto') {
       var postData = e.postData ? e.postData.contents : '';

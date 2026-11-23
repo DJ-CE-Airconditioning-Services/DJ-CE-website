@@ -972,6 +972,7 @@ tr:hover td { background:var(--bg-elev2); }
 <iframe id="photoUploadFrame" name="photoUploadFrame" style="display:none"></iframe>
 <form id="photoUploadForm" method="POST" target="photoUploadFrame" style="display:none">
   <input type="hidden" name="action" value="uploadPhoto">
+  <input type="hidden" name="token" id="puf_token">
   <input type="hidden" name="base64" id="puf_base64">
   <input type="hidden" name="bookingId" id="puf_bookingId">
   <input type="hidden" name="photoType" id="puf_photoType">
@@ -1089,14 +1090,17 @@ tr:hover td { background:var(--bg-elev2); }
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHttRvS4rEsoFCnHBCQyVrmdpFcCDcjdxKfQI4H-M6wP5fIoNgZrZ37ikPgcytVKoiNQ/exec';
 const APPS_URL = APPS_SCRIPT_URL;
 
-// ACCOUNTS — loaded from localStorage (seeded from defaults on first run)
+// AUTH TOKEN — stored after server-side login
+var _authToken = '';
+
+// ACCOUNTS — no passwords stored client-side (server-side auth only)
 const DEFAULT_ACCOUNTS = {
-  owner:  { username:'owner',  password:'djce2025',  name:'Owner',             role:'owner', avatar:'OW', lastPwChange: null, forceChange: true },
-  admin:  { username:'admin',  password:'admin2025', name:'Admin/Dispatcher',  role:'admin', avatar:'AD', lastPwChange: null, forceChange: true },
-  tech1:  { username:'tech1',  password:'tech2025',  name:'Papa (Senior Tech)',role:'tech',  avatar:'PT', lastPwChange: null, forceChange: true },
-  tech2:  { username:'tech2',  password:'tech2025',  name:'Helper 1',          role:'tech',  avatar:'H1', lastPwChange: null, forceChange: true },
-  tech3:  { username:'tech3',  password:'tech2025',  name:'Helper 2',          role:'tech',  avatar:'H2', lastPwChange: null, forceChange: true },
-  mama:   { username:'mama',   password:'mama2025',  name:'Mama (Marketing)',  role:'mama',  avatar:'MA', lastPwChange: null, forceChange: true },
+  owner:  { username:'owner',  name:'Owner',             role:'owner', avatar:'OW', lastPwChange: null, forceChange: true },
+  admin:  { username:'admin',  name:'Admin/Dispatcher',  role:'admin', avatar:'AD', lastPwChange: null, forceChange: true },
+  tech1:  { username:'tech1',  name:'Papa (Senior Tech)',role:'tech',  avatar:'PT', lastPwChange: null, forceChange: true },
+  tech2:  { username:'tech2',  name:'Helper 1',          role:'tech',  avatar:'H1', lastPwChange: null, forceChange: true },
+  tech3:  { username:'tech3',  name:'Helper 2',          role:'tech',  avatar:'H2', lastPwChange: null, forceChange: true },
+  mama:   { username:'mama',   name:'Mama (Marketing)',  role:'mama',  avatar:'MA', lastPwChange: null, forceChange: true },
 };
 let USERS = {};
 
@@ -1120,18 +1124,12 @@ function _applySheetAccounts(res) {
       if (!USERS[u]) {
         USERS[u] = acc;
       } else {
-        if (acc.password) USERS[u].password = acc.password;
+        // No password/PIN synced — server handles auth now
         if (acc.name) USERS[u].name = acc.name;
         if (acc.role) USERS[u].role = acc.role;
         if (acc.avatar) USERS[u].avatar = acc.avatar;
         if (acc.lastPwChange) USERS[u].lastPwChange = acc.lastPwChange;
         if (acc.forceChange !== undefined) USERS[u].forceChange = (acc.forceChange === 'true' || acc.forceChange === true);
-        // PIN: sync even when empty/cleared on another device
-        if (acc.hasOwnProperty('pin')) {
-          USERS[u].pin = (acc.pin === '__CLEAR__' || !acc.pin) ? '' : acc.pin;
-          // Also clear leftover localStorage PIN when cleared remotely
-          if (!USERS[u].pin) try { localStorage.removeItem('djce_pin_'+u); } catch(e){}
-        }
         // Permissions: sync from Sheets
         if (acc.hasOwnProperty('permissions')) {
           if (typeof acc.permissions === 'string') {
@@ -1175,10 +1173,14 @@ function handleEmergencyTap() {
   if (_emergTaps === 1) _emergTimer = setTimeout(function(){ _emergTaps = 0; }, 3000);
   if (_emergTaps >= 5) {
     clearTimeout(_emergTimer); _emergTaps = 0;
-    if (confirm('🔑 Emergency Reset\n\nReset all accounts to default credentials?\n\nowner / djce2025\nadmin / admin2025\ntech1-3 / tech2025')) {
+    if (confirm('🔑 Emergency Reset\n\nReset local account cache?\n\nNote: Password reset must be done by the owner through the backend.')) {
       localStorage.removeItem('djce_accounts');
+      localStorage.removeItem('djce_token');
+      localStorage.removeItem('djce_session');
+      _authToken = '';
+      session = null;
       loadAccounts();
-      alert('✅ Accounts reset!\n\nLogin with:\nowner / djce2025');
+      alert('✅ Local cache cleared!\n\nPlease contact the owner if you need a password reset.');
     }
   }
 }
@@ -1234,18 +1236,24 @@ function verifySecurityAnswer(username) {
     +'<button class="btn-login" style="width:100%;margin-top:8px" onclick="resetForgotPassword(\''+username+'\')">🔑 Reset Password</button>';
 }
 
-function resetForgotPassword(username) {
+async function resetForgotPassword(username) {
   var pw = (document.getElementById('fp_newpw')?.value||'');
   var con = (document.getElementById('fp_conpw')?.value||'');
-  if (pw.length < 6) { document.getElementById('forgotPwErr').textContent = 'Password must be at least 6 characters.'; return; }
+  var pwErr = validateStrongPassword(pw);
+  if (pwErr) { document.getElementById('forgotPwErr').textContent = pwErr; return; }
   if (pw !== con) { document.getElementById('forgotPwErr').textContent = 'Passwords do not match.'; return; }
-  USERS[username].password = pw;
+
+  // Reset password server-side (no token needed, security question already verified)
+  var res = await callSheets({ action: 'resetPasswordNoAuth', username: username, newPassword: pw });
+  if (!res || !res.ok) {
+    document.getElementById('forgotPwErr').textContent = res?.error || 'Failed to reset password. Try again.';
+    return;
+  }
   USERS[username].lastPwChange = new Date().toISOString();
   USERS[username].forceChange = false;
   saveAccounts();
-  syncAccountToSheets({username:username, password:pw, lastPwChange:USERS[username].lastPwChange, forceChange:false});
   closeForgotPassword();
-  alert('✅ Password reset successfully!\n\nYou can now login with your new password.');
+  showToast('Password reset successfully! You can now sign in with your new password. ✅','success');
 }
 
 function isPwExpired(acc) {
@@ -1663,9 +1671,11 @@ const LOGIN_LOCK_MINS = 15;
 function init() {
   applyTheme(localStorage.getItem('djce_theme') || 'dark');
   loadAccounts();
+  // Restore auth token from localStorage
+  try { _authToken = localStorage.getItem('djce_token') || ''; } catch(e) { _authToken = ''; }
   // Fetch latest accounts from Sheets in background (source of truth)
   loadAccountsFromSheets();
-  // Load remembered credentials after a short delay so DOM is ready
+  // Load remembered username after a short delay so DOM is ready
   setTimeout(loadRemembered, 50);
   // Inject logo into static HTML img tags
   const logoSrc = 'data:image/jpeg;base64,' + DJCE_LOGO.replace('data:image/jpeg;base64,','');
@@ -1674,8 +1684,11 @@ function init() {
     if (el) el.src = DJCE_LOGO;
   });
   const saved = localStorage.getItem('djce_session');
-  if (saved) {
+  if (saved && _authToken) {
     try { session = JSON.parse(saved); showPortal(); } catch(e) { /* ignore */ }
+  } else if (saved && !_authToken) {
+    // Session exists but no token — clear stale session
+    localStorage.removeItem('djce_session');
   }
   loadLocalData();
   syncHouseholdToOpex();
@@ -1723,9 +1736,8 @@ function loadRemembered() {
     var saved = localStorage.getItem('djce_remember');
     if (!saved) return;
     var data = JSON.parse(saved);
-    if (data.username && data.password) {
+    if (data.username) {
       document.getElementById('username').value = data.username;
-      document.getElementById('password').value = data.password;
       // Turn on toggle
       var cb = document.getElementById('rememberMe');
       if (cb) {
@@ -1781,51 +1793,64 @@ async function handleLogin() {
     return;
   }
 
-  // Wait for Sheets sync to finish before checking credentials
-  if (_accountSyncPromise && !_accountSyncDone) {
-    btn.textContent = 'Syncing...'; btn.disabled = true;
-    try { await _accountSyncPromise; } catch(e) {}
-    btn.textContent = 'Sign In →'; btn.disabled = false;
-  }
-
-  const user = USERS[u];
-  if (!user || user.password !== p) {
-    _loginAttempts++;
-    var remain = MAX_LOGIN_ATTEMPTS - _loginAttempts;
-    if (_loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      _loginLockUntil = Date.now() + LOGIN_LOCK_MINS * 60000;
-      _loginAttempts = 0;
-      showErr('Account locked for ' + LOGIN_LOCK_MINS + ' minutes due to too many failed attempts.');
-    } else {
-      showErr('Invalid username or password. ' + remain + ' attempt' + (remain>1?'s':'') + ' left.');
-    }
-    if (!remember) localStorage.removeItem('djce_remember');
-    return;
-  }
-  _loginAttempts = 0;
-  _loginLockUntil = 0;
-
-  // Save or clear remembered credentials
-  if (remember) {
-    localStorage.setItem('djce_remember', JSON.stringify({username:u, password:p}));
-  } else {
-    localStorage.removeItem('djce_remember');
-  }
-
   btn.textContent = 'Signing in...'; btn.disabled = true;
-  setTimeout(() => {
-    session = { username: u, name: user.name, role: user.role, avatar: user.avatar };
+
+  try {
+    // Server-side authentication
+    var res = await callSheets({ action: 'login', username: u, password: p });
+
+    if (!res || !res.ok) {
+      btn.textContent = 'Sign In →'; btn.disabled = false;
+      _loginAttempts++;
+      var remain = MAX_LOGIN_ATTEMPTS - _loginAttempts;
+      if (_loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        _loginLockUntil = Date.now() + LOGIN_LOCK_MINS * 60000;
+        _loginAttempts = 0;
+        showErr('Account locked for ' + LOGIN_LOCK_MINS + ' minutes due to too many failed attempts.');
+      } else {
+        showErr('Invalid username or password. ' + remain + ' attempt' + (remain>1?'s':'') + ' left.');
+      }
+      if (!remember) localStorage.removeItem('djce_remember');
+      return;
+    }
+
+    _loginAttempts = 0;
+    _loginLockUntil = 0;
+
+    // Store auth token
+    _authToken = res.token;
+    try { localStorage.setItem('djce_token', res.token); } catch(e) {}
+
+    // Save or clear remembered username (NOT password)
+    if (remember) {
+      localStorage.setItem('djce_remember', JSON.stringify({username:u}));
+    } else {
+      localStorage.removeItem('djce_remember');
+    }
+
+    // Update USERS cache with server data (no password)
+    USERS[u] = {
+      username: res.username, name: res.name, role: res.role,
+      avatar: res.avatar, forceChange: res.forceChange
+    };
+    saveAccounts();
+
+    session = { username: u, name: res.name, role: res.role, avatar: res.avatar };
     localStorage.setItem('djce_session', JSON.stringify(session));
-    syncAccountToSheets({username:u, lastLogin:new Date().toISOString()});
-    logActivity('🔐', `${session.name} signed in`, 'auth');
+    logActivity('🔐', session.name + ' signed in', 'auth');
     btn.textContent = 'Sign In →'; btn.disabled = false;
-    // Check forced change or 90-day expiry
-    if (user.forceChange || isPwExpired(user)) {
-      showForcedPwChange(user.forceChange);
+
+    // Check forced change or password expiry
+    if (res.forceChange || res.pwExpired) {
+      showForcedPwChange(res.forceChange);
       return;
     }
     showPortal();
-  }, 500);
+  } catch(err) {
+    btn.textContent = 'Sign In →'; btn.disabled = false;
+    showErr('Connection error. Please check your internet and try again.');
+    console.log('Login error:', err);
+  }
 }
 
 function showErr(msg) {
@@ -1841,13 +1866,19 @@ function handleLogout() {
     '🚪',
     function() {
       try { logActivity('🚪', session.name + ' logged out', 'logout'); } catch(e) {}
+      // Invalidate server-side token
+      if (_authToken) {
+        callSheets({ action: 'logout', token: _authToken }).catch(function(){});
+      }
+      _authToken = '';
+      try { localStorage.removeItem('djce_token'); } catch(e) {}
       stopAutoSync();
       session = null;
       localStorage.removeItem('djce_session');
       document.body.classList.remove('portal-active');
       document.getElementById('loginScreen').style.display='';
       document.getElementById('portalApp').style.display='none';
-      // Restore remembered credentials on the login screen
+      // Restore remembered username on the login screen
       setTimeout(loadRemembered, 50);
     }
   );
@@ -7066,6 +7097,7 @@ function openPhotoViewer(bookingId, photoId) {
 }
 function uploadPhotoToDrive(base64Data, bookingId, photoType, fileName) {
   var form = document.getElementById('photoUploadForm');
+  document.getElementById('puf_token').value = _authToken || '';
   document.getElementById('puf_base64').value = base64Data;
   document.getElementById('puf_bookingId').value = bookingId;
   document.getElementById('puf_photoType').value = photoType;
@@ -11310,6 +11342,10 @@ function loadLocalData() {
 
 function callSheets(params, timeout, _retryMode) {
   timeout = timeout || 20000;
+  // Auto-attach auth token to every request (except login/public actions)
+  if (_authToken && !params.token) {
+    params.token = _authToken;
+  }
   var query = Object.keys(params).map(function(k){
     return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
   }).join('&');
@@ -11358,10 +11394,26 @@ function callSheets(params, timeout, _retryMode) {
     });
   }
 
+  // Check for auth expiry on response
+  function checkAuth(data) {
+    if (data && data.code === 'AUTH_REQUIRED' && _authToken) {
+      // Token expired — force re-login
+      _authToken = '';
+      try { localStorage.removeItem('djce_token'); } catch(e) {}
+      try { localStorage.removeItem('djce_session'); } catch(e) {}
+      showToast('Session expired. Please sign in again.', 'error');
+      session = null;
+      document.body.classList.remove('portal-active');
+      document.getElementById('loginScreen').style.display='';
+      document.getElementById('portalApp').style.display='none';
+    }
+    return data;
+  }
+
   // _retryMode: 0=try fetch→jsonp, 1=jsonp only, 2=jsonp noCookies
-  if (_retryMode === 1) return viaJSONP(false);
-  if (_retryMode === 2) return viaJSONP(true);
-  return viaFetch().catch(function(){ return viaJSONP(false); });
+  if (_retryMode === 1) return viaJSONP(false).then(checkAuth);
+  if (_retryMode === 2) return viaJSONP(true).then(checkAuth);
+  return viaFetch().catch(function(){ return viaJSONP(false); }).then(checkAuth);
 }
 
 async function fetchFromSheets() {
@@ -13447,12 +13499,19 @@ function saveEditAccount(oldUsername){
   if(u.role !== 'owner') {
     updated.permissions = getSelectedPerms();
   }
-  if(pw){ updated.password=pw; updated.lastPwChange=new Date().toISOString(); updated.forceChange=false; }
+  if(pw){
+    // Password change handled server-side — sync hashed password
+    updated.lastPwChange=new Date().toISOString(); updated.forceChange=false;
+    // Send password to server for hashing via saveAccount
+    callSheets({ action: 'resetPasswordNoAuth', username: newU, newPassword: pw }).catch(function(){});
+  }
   if(newU!==oldUsername) {
     delete USERS[oldUsername];
     // Delete old username from Sheets if renamed
     callSheets({ action: 'deleteAccount', username: oldUsername }).catch(function(){});
   }
+  // Don't include password in local USERS or sync data
+  delete updated.password;
   USERS[newU] = updated;
   saveAccounts();
   syncAccountToSheets(updated);
@@ -13550,29 +13609,36 @@ function saveSecurityQuestion() {
   switchView('settings');
 }
 
-function changeMyPassword(){
+async function changeMyPassword(){
   const cur=document.getElementById('set_curpw')?.value;
   const np=document.getElementById('set_newpw')?.value;
   const cp=document.getElementById('set_conpw')?.value;
   if(!cur||!np||!cp){showToast('Please fill in all fields','error');return;}
-  if(USERS[session.username].password!==cur){showToast('Current password is incorrect','error');return;}
   var pwErr=validateStrongPassword(np);
   if(pwErr){showToast(pwErr,'error');return;}
   if(np!==cp){showToast('Passwords do not match','error');return;}
   if(np===cur){showToast('New password must be different from current','error');return;}
-  USERS[session.username].password=np;
+
+  // Verify current password by trying to login
+  showToast('Verifying current password...','info');
+  var verifyRes = await callSheets({ action: 'login', username: session.username, password: cur });
+  if (!verifyRes || !verifyRes.ok) {
+    showToast('Current password is incorrect','error');
+    return;
+  }
+  // Use new token from verification
+  _authToken = verifyRes.token;
+  try { localStorage.setItem('djce_token', verifyRes.token); } catch(e){}
+
+  // Change password server-side
+  var res = await callSheets({ action: 'changePassword', newPassword: np });
+  if (!res || !res.ok) {
+    showToast(res?.error || 'Failed to change password','error');
+    return;
+  }
   USERS[session.username].lastPwChange=new Date().toISOString();
   USERS[session.username].forceChange=false;
   saveAccounts();
-  syncAccountToSheets({username:session.username, password:np, lastPwChange:USERS[session.username].lastPwChange, forceChange:false});
-  // Update remembered credentials if saved
-  try {
-    var rem = JSON.parse(localStorage.getItem('djce_remember')||'null');
-    if (rem && rem.username === session.username) {
-      rem.password = np;
-      localStorage.setItem('djce_remember', JSON.stringify(rem));
-    }
-  } catch(e){}
   logActivity('🔑',session.name+' changed password','settings');
   showToast('Password changed successfully! ✅','success');
   switchView('settings');
@@ -13587,7 +13653,7 @@ function showForcedPwChange(isFirst=false){
     :'Your password has expired (90 days). Please set a new password to continue.';
 }
 
-function submitForcedPw(){
+async function submitForcedPw(){
   const np=document.getElementById('fpw_new').value;
   const cp=document.getElementById('fpw_confirm').value;
   const err=document.getElementById('fpwErr');
@@ -13595,19 +13661,16 @@ function submitForcedPw(){
   var pwErr2=validateStrongPassword(np);
   if(!np||pwErr2){err.textContent=pwErr2||'Password is required.';err.style.display='block';return;}
   if(np!==cp){err.textContent='Passwords do not match.';err.style.display='block';return;}
-  USERS[session.username].password=np;
+
+  // Change password server-side
+  var res = await callSheets({ action: 'changePassword', newPassword: np });
+  if (!res || !res.ok) {
+    err.textContent=res?.error||'Failed to change password. Try again.';err.style.display='block';
+    return;
+  }
   USERS[session.username].lastPwChange=new Date().toISOString();
   USERS[session.username].forceChange=false;
   saveAccounts();
-  syncAccountToSheets({username:session.username, password:np, lastPwChange:USERS[session.username].lastPwChange, forceChange:false});
-  // Update remembered credentials if saved
-  try {
-    var rem = JSON.parse(localStorage.getItem('djce_remember')||'null');
-    if (rem && rem.username === session.username) {
-      rem.password = np;
-      localStorage.setItem('djce_remember', JSON.stringify(rem));
-    }
-  } catch(e){}
   logActivity('🔑',session.name+' set new password (forced)','auth');
   document.getElementById('forcedPwScreen').style.display='none';
   showToast('Password updated! 🎉','success');
@@ -13806,9 +13869,12 @@ function saveNewAccount(){
   if(!/^[a-z0-9_]+$/.test(u)){showToast('Username: lowercase letters, numbers, underscore only','error');return;}
   const initials=n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
   const perms=getSelectedPerms();
-  USERS[u]={username:u,password:p,name:n,role:r,avatar:initials,lastPwChange:null,forceChange:true,permissions:perms};
+  USERS[u]={username:u,name:n,role:r,avatar:initials,lastPwChange:null,forceChange:true,permissions:perms};
   saveAccounts();
-  syncAccountToSheets(USERS[u]);
+  // Create account with hashed password on server
+  syncAccountToSheets({username:u,name:n,role:r,avatar:initials,lastPwChange:'',forceChange:true,permissions:JSON.stringify(perms)});
+  // Set password server-side (hashed)
+  callSheets({ action: 'resetPasswordNoAuth', username: u, newPassword: p }).catch(function(){});
   logActivity('➕','Owner created account @'+u+' ('+n+') with '+perms.length+' permissions','settings');
   closeModal('editModal');
   showToast('Account @'+u+' created! They must change password on first login.','success');
@@ -14141,14 +14207,21 @@ function pinForgot() {
   setTimeout(function(){ document.getElementById('pinForgotPw')?.focus(); }, 100);
 }
 
-function verifyPinForgotPw() {
+async function verifyPinForgotPw() {
   var pw = (document.getElementById('pinForgotPw')?.value || '').trim();
   if (!pw) { document.getElementById('pinForgotErr').textContent = 'Enter your password.'; return; }
-  var me = USERS[session.username];
-  if (!me || me.password !== pw) {
+
+  // Verify password server-side
+  document.getElementById('pinForgotErr').textContent = 'Verifying...';
+  var res = await callSheets({ action: 'login', username: session.username, password: pw });
+  if (!res || !res.ok) {
     document.getElementById('pinForgotErr').textContent = 'Wrong password. Try again.';
     return;
   }
+  // Update token with fresh one
+  _authToken = res.token;
+  try { localStorage.setItem('djce_token', res.token); } catch(e){}
+
   // Password verified — clear old PIN and show setup
   clearPin();
   unlockPortal();
@@ -14257,11 +14330,18 @@ function changePinVerify() {
   switchView('settings'); // re-render to show updated state
 }
 
-function resetPinWithPassword() {
+async function resetPinWithPassword() {
   var pw = (document.getElementById('pin_resetpw')?.value||'').trim();
   if (!pw) { showToast('Enter your password first','error'); return; }
-  var me = USERS[session.username];
-  if (!me || me.password !== pw) { showToast('Wrong password','error'); return; }
+
+  // Verify password server-side
+  showToast('Verifying password...','info');
+  var res = await callSheets({ action: 'login', username: session.username, password: pw });
+  if (!res || !res.ok) { showToast('Wrong password','error'); return; }
+  // Update token with fresh one
+  _authToken = res.token;
+  try { localStorage.setItem('djce_token', res.token); } catch(e){}
+
   // Password correct — clear old PIN and open setup
   clearPin();
   document.getElementById('pin_resetpw').value = '';
