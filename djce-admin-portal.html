@@ -4548,6 +4548,9 @@ function renderClients() {
           <option value="due">🔴 Due Soon (within warning window)</option>
           <option value="ok">✅ On Track</option>
           <option value="blacklisted">🚫 Blacklisted</option>
+          <optgroup label="── By Service Type ──">
+          ${SERVICES.map(s=>'<option value="svc:'+s+'">🔧 '+s+'</option>').join('')}
+          </optgroup>
         </select>
       </div>
       <div class="tbl-wrap"><table>
@@ -4610,6 +4613,7 @@ function filterClientsView(q) {
   else if (filter==='due') clients = clients.filter(c=>{if(!c.nextCleaningDate)return false;const d=new Date(c.nextCleaningDate);const diff=(d-now)/(1000*60*60*24);return diff>=0&&diff<=(SERVICE_SETTINGS.warningDays||14);});
   else if (filter==='ok') clients = clients.filter(c=>{if(!c.nextCleaningDate)return true;return(new Date(c.nextCleaningDate)-now)/(1000*60*60*24)>(SERVICE_SETTINGS.warningDays||14);});
   else if (filter==='blacklisted') clients = clients.filter(c=>isBlacklisted(c.name,c.phone));
+  else if (filter.startsWith('svc:')) { const svc=filter.slice(4); clients = clients.filter(c=>(c.lastService||'').toLowerCase().includes(svc.toLowerCase())); }
   const tb=document.getElementById('clTBody');
   if(tb)tb.innerHTML=renderClientRows(clients);
 }
