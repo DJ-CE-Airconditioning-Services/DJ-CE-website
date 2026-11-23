@@ -873,8 +873,8 @@ function getAccountsSafe() {
     var obj = {};
     headers.forEach(function(h, i) {
       var key = headerToKey(h);
-      // Strip sensitive fields
-      if (key === 'password' || key === 'pin') return;
+      // Strip sensitive fields (keep PIN so it syncs across devices)
+      if (key === 'password') return;
       obj[key] = cellToString(row[i]);
     });
     return obj;

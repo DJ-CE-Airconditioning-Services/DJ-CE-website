@@ -1124,7 +1124,8 @@ function _applySheetAccounts(res) {
       if (!USERS[u]) {
         USERS[u] = acc;
       } else {
-        // No password/PIN synced — server handles auth now
+        // Password stays server-side; PIN syncs for cross-device unlock
+        if (acc.pin) USERS[u].pin = acc.pin;
         if (acc.name) USERS[u].name = acc.name;
         if (acc.role) USERS[u].role = acc.role;
         if (acc.avatar) USERS[u].avatar = acc.avatar;
