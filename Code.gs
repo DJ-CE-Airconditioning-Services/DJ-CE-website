@@ -283,6 +283,21 @@ var HEADERS = {
   ],
   CalendarNotes: [
     'Date','Note','Category','Created By','Created At','Updated At'
+  ],
+  Commissions: [
+    'Commission ID','Booking ID','Referred By','Type','Gross Profit','Rate','Amount','Status','Approved Date','Month','Created At'
+  ],
+  PettyCash: [
+    'Entry ID','Date','Type','Amount','Description','Receipt Ref','Related Job ID','Category','Month','Created At'
+  ],
+  Targets: [
+    'Month Key','Target','Notes','Updated At'
+  ],
+  ThirteenthMonth: [
+    'Record ID','Employee ID','Year','Monthly JSON','Total','Status','Updated At'
+  ],
+  UnitSales: [
+    'Sale ID','Date','Product ID','Qty','Unit Price','Total Price','Cost Price','Buyer','Phone','Notes','Sold By','Serial Number','Created At'
   ]
 };
 
@@ -443,6 +458,19 @@ function doGet(e) {
         case 'saveBookingPhotos':  result = saveBookingPhotosAction(params); break;
         case 'getCalendarNotes':   result = getCalendarNotes();         break;
         case 'saveCalendarNotes':  result = saveCalendarNotesAction(params); break;
+        case 'getCommissions':     result = getCommissions();             break;
+        case 'saveCommission':     result = saveCommission(params);      break;
+        case 'deleteCommission':   result = deleteCommission(params);    break;
+        case 'getPettyCash':       result = getPettyCash();              break;
+        case 'savePettyCash':      result = savePettyCash(params);       break;
+        case 'deletePettyCash':    result = deletePettyCash(params);     break;
+        case 'getTargets':         result = getTargets();                break;
+        case 'saveTarget':         result = saveTarget(params);          break;
+        case 'getThirteenthMonth': result = getThirteenthMonth();        break;
+        case 'saveThirteenthMonth':result = saveThirteenthMonth(params); break;
+        case 'getUnitSales':       result = getUnitSales();              break;
+        case 'saveUnitSale':       result = saveUnitSale(params);        break;
+        case 'deleteUnitSale':     result = deleteUnitSale(params);      break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -1662,6 +1690,221 @@ function deleteInvestor(p) {
     }
   }
   return { ok: false, error: 'Investor record not found: ' + id };
+}
+
+/* ─── COMMISSIONS ─────────────────────────────────────────── */
+function getCommissions() {
+  var sheet = getOrCreateSheet('Commissions');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveCommission(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('Commissions');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r,2).setValue(data.bookingId||'');
+      sheet.getRange(r,3).setValue(data.referredBy||'');
+      sheet.getRange(r,4).setValue(data.type||'');
+      sheet.getRange(r,5).setValue(data.grossProfit||0);
+      sheet.getRange(r,6).setValue(data.rate||0);
+      sheet.getRange(r,7).setValue(data.amount||0);
+      sheet.getRange(r,8).setValue(data.status||'pending');
+      sheet.getRange(r,9).setValue(data.approvedDate||'');
+      sheet.getRange(r,10).setValue(data.month||'');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('COM-' + new Date().getTime());
+  sheet.appendRow([id, data.bookingId||'', data.referredBy||'', data.type||'', data.grossProfit||0, data.rate||0, data.amount||0, data.status||'pending', data.approvedDate||'', data.month||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deleteCommission(p) {
+  if (!p.id) return { ok: false, error: 'Missing commission ID' };
+  var sheet = getOrCreateSheet('Commissions');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(p.id)) { sheet.deleteRow(i+1); return { ok: true, action: 'deleted' }; }
+  }
+  return { ok: false, error: 'Not found' };
+}
+
+/* ─── PETTY CASH ──────────────────────────────────────────── */
+function getPettyCash() {
+  var sheet = getOrCreateSheet('PettyCash');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function savePettyCash(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('PettyCash');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r,2).setValue(data.date||'');
+      sheet.getRange(r,3).setValue(data.type||'');
+      sheet.getRange(r,4).setValue(data.amount||0);
+      sheet.getRange(r,5).setValue(data.description||'');
+      sheet.getRange(r,6).setValue(data.receiptRef||'');
+      sheet.getRange(r,7).setValue(data.relatedJobId||'');
+      sheet.getRange(r,8).setValue(data.category||'');
+      sheet.getRange(r,9).setValue(data.month||'');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('PC-' + new Date().getTime());
+  sheet.appendRow([id, data.date||'', data.type||'', data.amount||0, data.description||'', data.receiptRef||'', data.relatedJobId||'', data.category||'', data.month||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deletePettyCash(p) {
+  if (!p.id) return { ok: false, error: 'Missing petty cash ID' };
+  var sheet = getOrCreateSheet('PettyCash');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(p.id)) { sheet.deleteRow(i+1); return { ok: true, action: 'deleted' }; }
+  }
+  return { ok: false, error: 'Not found' };
+}
+
+/* ─── TARGETS ─────────────────────────────────────────────── */
+function getTargets() {
+  var sheet = getOrCreateSheet('Targets');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveTarget(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('Targets');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.monthKey)) {
+      sheet.getRange(i+1,2).setValue(data.target||0);
+      sheet.getRange(i+1,3).setValue(data.notes||'');
+      sheet.getRange(i+1,4).setValue(now());
+      return { ok: true, action: 'updated' };
+    }
+  }
+  sheet.appendRow([data.monthKey||'', data.target||0, data.notes||'', now()]);
+  return { ok: true, action: 'created' };
+}
+
+/* ─── 13TH MONTH ──────────────────────────────────────────── */
+function getThirteenthMonth() {
+  var sheet = getOrCreateSheet('ThirteenthMonth');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveThirteenthMonth(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('ThirteenthMonth');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r,2).setValue(data.employeeId||'');
+      sheet.getRange(r,3).setValue(data.year||'');
+      sheet.getRange(r,4).setValue(typeof data.monthly==='string' ? data.monthly : JSON.stringify(data.monthly||[]));
+      sheet.getRange(r,5).setValue(data.total||0);
+      sheet.getRange(r,6).setValue(data.status||'accumulating');
+      sheet.getRange(r,7).setValue(now());
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('13M-' + new Date().getTime());
+  sheet.appendRow([id, data.employeeId||'', data.year||'', typeof data.monthly==='string' ? data.monthly : JSON.stringify(data.monthly||[]), data.total||0, data.status||'accumulating', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+/* ─── UNIT SALES ──────────────────────────────────────────── */
+function getUnitSales() {
+  var sheet = getOrCreateSheet('UnitSales');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveUnitSale(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('UnitSales');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r,2).setValue(data.date||'');
+      sheet.getRange(r,3).setValue(data.productId||'');
+      sheet.getRange(r,4).setValue(data.qty||0);
+      sheet.getRange(r,5).setValue(data.unitPrice||0);
+      sheet.getRange(r,6).setValue(data.totalPrice||0);
+      sheet.getRange(r,7).setValue(data.costPrice||0);
+      sheet.getRange(r,8).setValue(data.buyer||'');
+      sheet.getRange(r,9).setValue(data.phone||'');
+      sheet.getRange(r,10).setValue(data.notes||'');
+      sheet.getRange(r,11).setValue(data.soldBy||'');
+      sheet.getRange(r,12).setValue(data.serialNumber||'');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('US-' + new Date().getTime());
+  sheet.appendRow([id, data.date||'', data.productId||'', data.qty||0, data.unitPrice||0, data.totalPrice||0, data.costPrice||0, data.buyer||'', data.phone||'', data.notes||'', data.soldBy||'', data.serialNumber||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deleteUnitSale(p) {
+  if (!p.id) return { ok: false, error: 'Missing sale ID' };
+  var sheet = getOrCreateSheet('UnitSales');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(p.id)) { sheet.deleteRow(i+1); return { ok: true, action: 'deleted' }; }
+  }
+  return { ok: false, error: 'Not found' };
 }
 
 /* ─── EMAIL HELPERS ───────────────────────────────────────── */

@@ -10271,6 +10271,10 @@ function saveMonthlyTargets() {
     }
   });
   saveAcctData();
+  // Sync each target to Sheets
+  Object.keys(ACCT_TARGETS).forEach(function(key){
+    callSheets({ action:'saveTarget', data:encodeURIComponent(JSON.stringify({ monthKey:key, target:ACCT_TARGETS[key].target||0, notes:ACCT_TARGETS[key].notes||'' })) }).catch(function(){});
+  });
   showToast('Monthly targets saved','success');
   logActivity('🎯','Updated monthly revenue targets','accounting');
 }
@@ -10461,7 +10465,7 @@ function generateCommission(bookingId) {
   var dateObj = b.date ? new Date(b.date) : new Date();
   var month = dateObj.getFullYear()+'-'+String(dateObj.getMonth()+1).padStart(2,'0');
 
-  ACCT_COMMISSIONS.push({
+  var commEntry = {
     id: 'COMM-'+Date.now(),
     bookingId: bookingId,
     referredBy: 'Mama',
@@ -10472,8 +10476,10 @@ function generateCommission(bookingId) {
     status: 'pending',
     approvedDate: '',
     month: month
-  });
+  };
+  ACCT_COMMISSIONS.push(commEntry);
   saveAcctData();
+  callSheets({ action:'saveCommission', data:encodeURIComponent(JSON.stringify(commEntry)) }).catch(function(){});
   logActivity('💵', 'Commission generated for '+bookingId+': ₱'+commAmount.toLocaleString()+' ('+type+', '+rate+'%)', 'commission');
 }
 
@@ -10484,6 +10490,7 @@ function approveCommission(commId) {
     c.status = 'approved';
     c.approvedDate = new Date().toISOString().split('T')[0];
     saveAcctData();
+    callSheets({ action:'saveCommission', data:encodeURIComponent(JSON.stringify(c)) }).catch(function(){});
     showToast('Commission approved ✅','success');
     logActivity('✅', 'Approved commission '+commId+': ₱'+(parseFloat(c.amount)||0).toLocaleString(), 'commission');
     switchView('accounting');
@@ -10499,6 +10506,7 @@ function rejectCommission(commId) {
   if (!confirm('Reject this commission?')) return;
   ACCT_COMMISSIONS = ACCT_COMMISSIONS.filter(function(x){return x.id!==commId;});
   saveAcctData();
+  callSheets({ action:'deleteCommission', id:commId }).catch(function(){});
   showToast('Commission removed','info');
   switchView('accounting');
 }
@@ -10719,6 +10727,7 @@ function savePettyCash(type) {
   function doSave() {
     ACCT_PETTY_CASH.push(entry);
     saveAcctData();
+    callSheets({ action:'savePettyCash', data:encodeURIComponent(JSON.stringify(entry)) }).catch(function(){});
     closeModal('expenseModal');
     showToast(type==='release'?'Petty cash released':'Petty cash '+type+' recorded','success');
     logActivity('💰','Petty cash '+type+': ₱'+amount.toLocaleString()+' — '+desc,'finance');
@@ -10737,6 +10746,7 @@ function deletePettyCash(id) {
   if (!confirm('Delete this petty cash entry?')) return;
   ACCT_PETTY_CASH = ACCT_PETTY_CASH.filter(function(e){return e.id!==id;});
   saveAcctData();
+  callSheets({ action:'deletePettyCash', id:id }).catch(function(){});
   showToast('Entry deleted','info');
   switchView('accounting');
 }
@@ -11111,6 +11121,7 @@ function saveSale() {
     serialNumber: serialNum
   };
   UNIT_SALES.push(sale);
+  callSheets({ action:'saveUnitSale', data:encodeURIComponent(JSON.stringify(sale)) }).catch(function(){});
   // Deduct stock
   prod.stock = (parseInt(prod.stock)||0) - qty;
   saveAcctData();
@@ -11124,6 +11135,7 @@ function deleteSale(id) {
   if (!confirm('Delete this sale record? Stock will NOT be restored automatically.')) return;
   UNIT_SALES = UNIT_SALES.filter(function(x){return x.id!==id;});
   saveAcctData();
+  callSheets({ action:'deleteUnitSale', id:id }).catch(function(){});
   switchView('unitsales');
   showToast('Sale record removed','info');
 }
@@ -11844,6 +11856,66 @@ async function fetchFromSheets() {
         try { localStorage.setItem('djce_calendar_notes', JSON.stringify(CALENDAR_NOTES)); } catch(e){}
       }
     } catch(e) { console.log('Calendar notes sync skipped:', e); }
+
+    // 23. Commissions
+    try {
+      const comData = await callSheets({ action: 'getCommissions' });
+      if (comData && comData.ok && comData.records && comData.records.length) {
+        comData.records.forEach(function(r){
+          r.id = r.commissionId || r.id;
+          if (!ACCT_COMMISSIONS.find(function(x){return x.id===r.id;})) ACCT_COMMISSIONS.push(r);
+          else Object.assign(ACCT_COMMISSIONS.find(function(x){return x.id===r.id;}), r);
+        });
+      }
+    } catch(e) { console.log('Commissions sync skipped:', e); }
+
+    // 24. Petty Cash
+    try {
+      const pcData = await callSheets({ action: 'getPettyCash' });
+      if (pcData && pcData.ok && pcData.records && pcData.records.length) {
+        pcData.records.forEach(function(r){
+          r.id = r.entryId || r.id;
+          if (!ACCT_PETTY_CASH.find(function(x){return x.id===r.id;})) ACCT_PETTY_CASH.push(r);
+          else Object.assign(ACCT_PETTY_CASH.find(function(x){return x.id===r.id;}), r);
+        });
+      }
+    } catch(e) { console.log('Petty cash sync skipped:', e); }
+
+    // 25. Targets
+    try {
+      const tgtData = await callSheets({ action: 'getTargets' });
+      if (tgtData && tgtData.ok && tgtData.records && tgtData.records.length) {
+        tgtData.records.forEach(function(r){
+          var key = r.monthKey;
+          if (key) ACCT_TARGETS[key] = { target: parseFloat(r.target)||0, notes: r.notes||'' };
+        });
+      }
+    } catch(e) { console.log('Targets sync skipped:', e); }
+
+    // 26. 13th Month
+    try {
+      const tmData = await callSheets({ action: 'getThirteenthMonth' });
+      if (tmData && tmData.ok && tmData.records && tmData.records.length) {
+        tmData.records.forEach(function(r){
+          r.id = r.recordId || r.id;
+          try { if (typeof r.monthlyJson==='string') r.monthly = JSON.parse(r.monthlyJson); } catch(e){ r.monthly = []; }
+          if (!ACCT_13TH_MONTH.find(function(x){return x.id===r.id;})) ACCT_13TH_MONTH.push(r);
+          else Object.assign(ACCT_13TH_MONTH.find(function(x){return x.id===r.id;}), r);
+        });
+      }
+    } catch(e) { console.log('13th month sync skipped:', e); }
+
+    // 27. Unit Sales
+    try {
+      const usData = await callSheets({ action: 'getUnitSales' });
+      if (usData && usData.ok && usData.records && usData.records.length) {
+        usData.records.forEach(function(r){
+          r.id = r.saleId || r.id;
+          if (!UNIT_SALES.find(function(x){return x.id===r.id;})) UNIT_SALES.push(r);
+          else Object.assign(UNIT_SALES.find(function(x){return x.id===r.id;}), r);
+        });
+      }
+    } catch(e) { console.log('Unit sales sync skipped:', e); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';
