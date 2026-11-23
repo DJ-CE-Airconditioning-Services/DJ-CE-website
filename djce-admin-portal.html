@@ -11727,7 +11727,34 @@ async function fetchFromSheets() {
       }
     } catch(e) { console.log('Booking photos sync skipped:', e); }
 
-    // 19. Calendar Notes
+    // 19. Daily Tracker
+    try {
+      const dtData = await callSheets({ action: 'getDailyTracker' });
+      if (dtData && dtData.ok && dtData.records && dtData.records.length) {
+        ACCT_DAILY_LOG = dtData.records;
+        saveAcctData();
+      }
+    } catch(e) { console.log('Daily tracker sync skipped:', e); }
+
+    // 20. Payroll
+    try {
+      const prData = await callSheets({ action: 'getPayroll' });
+      if (prData && prData.ok && prData.records && prData.records.length) {
+        ACCT_PAYROLL = prData.records;
+        saveAcctData();
+      }
+    } catch(e) { console.log('Payroll sync skipped:', e); }
+
+    // 21. Investors
+    try {
+      const ivData = await callSheets({ action: 'getInvestors' });
+      if (ivData && ivData.ok && ivData.investors && ivData.investors.length) {
+        ACCT_INVESTORS = ivData.investors;
+        saveAcctData();
+      }
+    } catch(e) { console.log('Investors sync skipped:', e); }
+
+    // 22. Calendar Notes
     try {
       const cnData = await callSheets({ action: 'getCalendarNotes' });
       if (cnData && cnData.ok && cnData.notes && Object.keys(cnData.notes).length) {
