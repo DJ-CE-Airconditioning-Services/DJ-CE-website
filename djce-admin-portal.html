@@ -1360,6 +1360,8 @@ function getServiceCode(svc) {
 
 let REF_COUNTERS = {}; // cached from Sheets { mmyy: {monthly, total} }
 var OPEX_CATEGORIES = ['Gas / Fuel', 'Payroll', 'Parts & Materials', 'Tricycle / Transport', 'Food Allowance', 'Tools & Equipment', 'Utilities', 'Warranty', 'Household — Food', 'Household — Utilities', 'Household — Transportation', 'Household — Other', 'Other'];
+// Load any custom operation categories added by user
+try { var _savedOpex = JSON.parse(localStorage.getItem('djce_opex_categories')||'null'); if(_savedOpex && _savedOpex.length){ _savedOpex.forEach(function(c){ if(OPEX_CATEGORIES.indexOf(c)===-1) OPEX_CATEGORIES.push(c); }); } } catch(e){}
 
 // Household budget config (editable) — stored in localStorage
 var HOUSEHOLD_BUDGETS = {};
@@ -7318,6 +7320,7 @@ function buildRevenueContent(from, to) {
     <div class="panel-head">
       <div class="panel-title">💸 Expenses (OPEX)</div>
       <div style="display:flex;gap:7px">
+        <button class="btn btn-outline btn-xs" onclick="addHouseholdCategory()">➕ Add Category</button>
         <button class="btn btn-gold btn-sm" onclick="openAddExpense()">➕ Add Expense</button>
       </div>
     </div>
@@ -7479,7 +7482,7 @@ function syncBlacklistToSheets() {
 }
 function syncActivityLogToSheets() {
   var last50 = ACTIVITY_LOG.slice(-50);
-  var items = last50.map(function(a){ return {'Timestamp':a.ts||a.timestamp||'','User':a.user||'','Action':a.action||'','Type':a.type||'','Details':a.details||''}; });
+  var items = last50.map(function(a){ return {'Timestamp':a.timestamp||a.ts||'','User':a.user||'','Action':a.icon||a.action||'','Type':a.type||'','Details':a.message||a.details||''}; });
   callSheets({ action:'saveActivityLog', data:encodeURIComponent(JSON.stringify({ items:items })) })
     .then(res=>{ if(res&&res.ok) console.log('Activity log synced'); }).catch(()=>{});
 }
@@ -7762,25 +7765,47 @@ function saveHouseholdBudgetSettings(){
 }
 
 function addHouseholdCategory(){
-  document.getElementById('expModalTitle').textContent = '➕ Add Household Category';
+  document.getElementById('expModalTitle').textContent = '➕ Add Category';
   document.getElementById('expModalBody').innerHTML = '<div class="form-grid">'
+    +'<div class="field"><label>Type *</label>'
+    +'<select id="hb_new_type"><option value="operation">Operation (OPEX)</option><option value="household">Household</option></select></div>'
     +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Groceries, Maintenance"></div>'
-    +'<div class="field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
+    +'<div class="field" id="hb_budget_field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
     +'</div>';
   document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
-    +'<button class="btn btn-gold btn-sm" onclick="saveNewHouseholdCat()">💾 Save</button>';
+    +'<button class="btn btn-gold btn-sm" onclick="saveNewCategory()">💾 Save</button>';
+  // Show/hide budget field based on type
+  var typeSelect = document.getElementById('hb_new_type');
+  var budgetField = document.getElementById('hb_budget_field');
+  typeSelect.addEventListener('change', function(){ budgetField.style.display = this.value==='household'?'':'none'; });
+  budgetField.style.display = typeSelect.value==='household'?'':'none';
   openModal('expenseModal');
 }
-function saveNewHouseholdCat(){
+function saveNewCategory(){
+  var catType = document.getElementById('hb_new_type')?.value||'household';
   var name = (document.getElementById('hb_new_name')?.value||'').trim();
   if(!name){ showToast('Enter a category name','error'); return; }
-  if(HOUSEHOLD_BUDGETS[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
-  HOUSEHOLD_BUDGETS[name] = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
-  saveHouseholdBudgets();
-  syncHouseholdToOpex();
-  closeModal('expenseModal');
-  showToast('Added: Household — '+name,'success');
-  refreshRevenue();
+  if(catType==='household'){
+    if(HOUSEHOLD_BUDGETS[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
+    HOUSEHOLD_BUDGETS[name] = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
+    saveHouseholdBudgets();
+    syncHouseholdToOpex();
+    closeModal('expenseModal');
+    showToast('Added: Household — '+name,'success');
+    refreshRevenue();
+  } else {
+    // Operation category
+    if(OPEX_CATEGORIES.indexOf(name)!==-1){ showToast('"'+name+'" already exists','warning'); return; }
+    OPEX_CATEGORIES.push(name);
+    try { localStorage.setItem('djce_opex_categories', JSON.stringify(OPEX_CATEGORIES)); } catch(e){}
+    closeModal('expenseModal');
+    showToast('Added operation category: '+name,'success');
+    refreshRevenue();
+  }
+}
+function saveNewHouseholdCat(){
+  // Legacy alias — calls the new unified function with household pre-selected
+  saveNewCategory();
 }
 
 function removeHouseholdCat(cat){
@@ -9022,11 +9047,12 @@ function saveEmployee(editId) {
 }
 
 function deleteEmployee(id) {
-  if (!confirm('Delete this employee?')) return;
-  ACCT_EMPLOYEES = ACCT_EMPLOYEES.filter(function(x){return x.id!==id;});
-  saveAcctData();
-  switchView('accounting');
-  showToast('Employee removed','info');
+  confirm2('Delete Employee','Delete this employee?','🗑️',function(){
+    ACCT_EMPLOYEES = ACCT_EMPLOYEES.filter(function(x){return x.id!==id;});
+    saveAcctData();
+    switchView('accounting');
+    showToast('Employee removed','info');
+  });
 }
 
 // ─── DAILY TRACKER SUB-TAB ────────────────────────
@@ -11653,11 +11679,31 @@ async function fetchFromSheets() {
       }
     } catch(e) { console.log('Blacklist sync skipped:', e); }
 
-    // 16. Activity Log
+    // 16. Employees
+    try {
+      const empData = await callSheets({ action: 'getEmployees' });
+      if (empData && empData.ok && empData.employees && empData.employees.length) {
+        // Merge with existing localStorage data to preserve extra fields (sss, philhealth, etc.)
+        var existingMap = {};
+        ACCT_EMPLOYEES.forEach(function(e){ if(e.id) existingMap[e.id]=e; });
+        empData.employees.forEach(function(e){
+          if(existingMap[e.id]){
+            // Update core fields from Sheets, keep extra fields from localStorage
+            Object.assign(existingMap[e.id], {name:e.name||existingMap[e.id].name, role:e.role||existingMap[e.id].role, type:e.type||existingMap[e.id].type, dailyRate:e.dailyRate||existingMap[e.id].dailyRate, status:e.status||existingMap[e.id].status, phone:e.phone||existingMap[e.id].phone, startDate:e.startDate||existingMap[e.id].startDate});
+          } else {
+            // New employee from Sheets not in localStorage
+            ACCT_EMPLOYEES.push(e);
+          }
+        });
+        saveAcctData();
+      }
+    } catch(e) { console.log('Employees sync skipped:', e); }
+
+    // 17. Activity Log
     try {
       const alData = await callSheets({ action: 'getActivityLog' });
       if (alData && alData.ok && alData.items && alData.items.length) {
-        ACTIVITY_LOG = alData.items.map(function(r){ return {ts:r['Timestamp'],user:r['User'],action:r['Action'],type:r['Type'],details:r['Details']}; });
+        ACTIVITY_LOG = alData.items.map(function(r){ return {icon:r['Action']||'📋',message:r['Details']||'',timestamp:r['Timestamp']||'',user:r['User']||'',type:r['Type']||'general'}; });
       }
     } catch(e) { console.log('Activity log sync skipped:', e); }
 
