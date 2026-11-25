@@ -3737,6 +3737,8 @@ async function saveBooking() {
       syncBookingToSheets(old);
     }
   });
+  // Sync booking client info → Client Records
+  _syncBookingToClient(BOOKINGS[id]);
   saveLocalData();
   logActivity('➕', `New booking: ${name} — ${service}${summary?' ('+summary+')':''}`, 'booking');
   addNotif(`New booking from ${name}: ${service}`, 'info', id);
@@ -13180,6 +13182,8 @@ function saveEditClient(){
   var serviceName=validSvc.map(function(e){return e.service;}).join(', ')||CLIENTS[id]?.lastService||'';
   var earliestNext='';
   validSvc.forEach(function(e){if(e.nextdate){if(!earliestNext||e.nextdate<earliestNext) earliestNext=e.nextdate;}});
+  // Track old client data before saving (for updating bookings)
+  var oldClient = CLIENTS[id] ? Object.assign({}, CLIENTS[id]) : null;
   if(!id||!CLIENTS[id]){
     var existId=Object.keys(CLIENTS).find(function(k){return CLIENTS[k].phone===phone;});
     if(existId) id=existId; else { id='CL-'+Date.now(); source='manual'; }
@@ -13197,12 +13201,73 @@ function saveEditClient(){
     nextCleaningDate:earliestNext||CLIENTS[id]?.nextCleaningDate||'',
     source:source, createdAt:CLIENTS[id]?.createdAt||new Date().toISOString()
   };
+  // Sync client details → matching bookings (by phone or old name)
+  _syncClientToBookings(CLIENTS[id], oldClient);
   saveLocalData();
   logActivity('✏️','Edited client: '+name,'client');
   syncClientToSheets(CLIENTS[id]);
   closeModal('editModal');
   showToast('Client '+name+' updated!','success');
   switchView('clients');
+}
+
+/** Propagate client edits to all matching bookings */
+function _syncClientToBookings(client, oldClient) {
+  var matchPhone = (client.phone||'').replace(/\D/g,'');
+  var matchName = (client.name||'').toLowerCase();
+  var oldPhone = oldClient ? (oldClient.phone||'').replace(/\D/g,'') : '';
+  var oldName = oldClient ? (oldClient.name||'').toLowerCase() : '';
+  var updated = 0;
+  Object.values(BOOKINGS).forEach(function(b) {
+    if (b.status === 'Deleted') return;
+    var bPhone = (b.phone||'').replace(/\D/g,'');
+    var bName = (b.name||'').toLowerCase();
+    // Match by phone or name (current or old)
+    var match = false;
+    if (matchPhone && bPhone && bPhone === matchPhone) match = true;
+    if (!match && oldPhone && bPhone && bPhone === oldPhone) match = true;
+    if (!match && matchName && bName && bName === matchName) match = true;
+    if (!match && oldName && bName && bName === oldName) match = true;
+    if (!match) return;
+    // Update booking's client fields
+    var changed = false;
+    if (client.name && b.name !== client.name) { b.name = client.name; changed = true; }
+    if (client.phone && b.phone !== client.phone) { b.phone = client.phone; changed = true; }
+    if (client.email && b.email !== client.email) { b.email = client.email; changed = true; }
+    if (client.address && b.address !== client.address) { b.address = client.address; changed = true; }
+    if (client.landmark && b.landmark !== client.landmark) { b.landmark = client.landmark; changed = true; }
+    if (changed) {
+      updated++;
+      syncBookingToSheets(b);
+    }
+  });
+  if (updated) console.log('✅ Updated client info in ' + updated + ' booking(s)');
+}
+
+/** Sync new/updated booking client info → CLIENTS record (if exists) */
+function _syncBookingToClient(booking) {
+  if (!booking || !booking.name) return;
+  var phone = (booking.phone||'').replace(/\D/g,'');
+  // Find matching CLIENTS entry by phone or name
+  var matchId = null;
+  Object.keys(CLIENTS).forEach(function(id) {
+    var c = CLIENTS[id];
+    if (c.deleted || c.source === 'deleted') return;
+    var cPhone = (c.phone||'').replace(/\D/g,'');
+    if (phone && cPhone && phone === cPhone) { matchId = id; return; }
+    if ((c.name||'').toLowerCase() === (booking.name||'').toLowerCase()) { matchId = id; }
+  });
+  if (!matchId) return; // No existing client record — mergeClients() auto-creates from bookings
+  var c = CLIENTS[matchId];
+  var changed = false;
+  // Update client fields from booking (only if booking has newer data)
+  if (booking.address && booking.address !== c.address) { c.address = booking.address; changed = true; }
+  if (booking.email && booking.email !== c.email) { c.email = booking.email; changed = true; }
+  if (booking.landmark && booking.landmark !== c.landmark) { c.landmark = booking.landmark; changed = true; }
+  if (changed) {
+    syncClientToSheets(c);
+    console.log('✅ Updated client record from booking: ' + c.name);
+  }
 }
 
 /* ===========================
