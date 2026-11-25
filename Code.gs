@@ -215,7 +215,7 @@ var HEADERS = {
   ],
   Accounts: [
     'Username','Password','Name','Role','Avatar',
-    'Last Pw Change','Force Change','Created At','Last Login','PIN'
+    'Last Pw Change','Force Change','Created At','Last Login','PIN','Profile Pic'
   ],
   Clients: [
     'Client ID','Name','Phone','Email','Address','Landmark',
@@ -1018,13 +1018,14 @@ function saveAccount(p) {
         pinCell.setNumberFormat('@'); // Force text format to preserve leading zeros
         pinCell.setValue(String(data.pin));
       }
+      if (data.profilePic !== undefined) sheet.getRange(i+1,11).setValue(data.profilePic);
       return { ok: true, action: 'updated', username: data.username };
     }
   }
   var newRow = sheet.appendRow([
     data.username, data.password||'', data.name||'', data.role||'',
     data.avatar||'?', data.lastPwChange||'', data.forceChange||'false',
-    now(), '', data.pin||''
+    now(), '', data.pin||'', data.profilePic||''
   ]);
   // Force text format on PIN column to preserve leading zeros
   if (data.pin) {

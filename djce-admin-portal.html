@@ -827,6 +827,9 @@ tr:hover td { background:var(--bg-elev2); }
     <button onclick="saveProfilePic()" style="width:100%;padding:14px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0d1f3c;border:none;border-radius:12px;font-weight:800;font-size:16px;cursor:pointer;transition:all 0.2s">
       Save & Continue →
     </button>
+    <button id="ppSkipBtn" onclick="skipProfilePic()" style="width:100%;padding:10px;background:transparent;color:var(--text-dim);border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px;transition:color 0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-dim)'">
+      Skip for now →
+    </button>
   </div>
 </div>
 
@@ -1137,6 +1140,16 @@ function _applySheetAccounts(res) {
         if (acc.avatar) USERS[u].avatar = acc.avatar;
         if (acc.lastPwChange) USERS[u].lastPwChange = acc.lastPwChange;
         if (acc.forceChange !== undefined) USERS[u].forceChange = (acc.forceChange === 'true' || acc.forceChange === true);
+        // Profile Pic: sync from Sheets to localStorage (cross-device)
+        if (acc.profilePic && !getProfilePic(u)) {
+          try {
+            var picData = JSON.parse(acc.profilePic);
+            saveProfilePicData(u, picData);
+          } catch(e) {
+            // If it's just an emoji string (not JSON), treat as avatar type
+            if (acc.profilePic.length <= 4) saveProfilePicData(u, {type:'avatar',emoji:acc.profilePic});
+          }
+        }
         // Permissions: sync from Sheets
         if (acc.hasOwnProperty('permissions')) {
           if (typeof acc.permissions === 'string') {
@@ -1893,9 +1906,17 @@ function handleLogout() {
   );
 }
 
+var _ppSyncWaited = false;
 function showPortal() {
-  // Check if profile pic is needed first
+  // Check if profile pic is needed — but wait for account sync first (pic may come from Sheets)
   if (session && !getProfilePic(session.username)) {
+    if (!_ppSyncWaited && !_accountSyncDone && _accountSyncPromise) {
+      // Wait for sync once, then recheck (pic may come from Sheets)
+      _ppSyncWaited = true;
+      _accountSyncPromise.then(function(){ showPortal(); }).catch(function(){ showPortal(); });
+      return;
+    }
+    // Sync done or already waited — still no pic, show setup
     showProfilePicSetup();
     return;
   }
@@ -14150,6 +14171,10 @@ function saveProfilePicData(username, data) {
     pics[username] = data;
     localStorage.setItem('djce_profile_pics', JSON.stringify(pics));
   } catch(e) {}
+  // Sync emoji avatars to Sheets (photos are too large)
+  if (data && data.type === 'avatar' && data.emoji) {
+    syncAccountToSheets({ username: username, profilePic: JSON.stringify(data) });
+  }
 }
 
 function showProfilePicSetup() {
@@ -14245,6 +14270,14 @@ function saveProfilePic() {
   document.getElementById('profilePicScreen').style.display='none';
   showPortal();
   showToast('Profile picture saved! 🎉','success');
+}
+
+function skipProfilePic() {
+  // Save default initials as avatar so setup doesn't re-appear
+  var defaultEmoji = session.avatar || '👤';
+  saveProfilePicData(session.username, {type:'avatar',emoji:defaultEmoji});
+  document.getElementById('profilePicScreen').style.display='none';
+  showPortal();
 }
 
 function applyProfilePic() {
