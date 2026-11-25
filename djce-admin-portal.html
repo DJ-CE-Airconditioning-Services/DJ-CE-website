@@ -4575,7 +4575,7 @@ function renderClients() {
         </select>
       </div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Client</th><th>Phone</th><th>Address</th><th>Last Service</th><th>Usage Freq.</th><th>Next Cleaning</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Client</th><th>Phone</th><th>Address</th><th>Last Service</th><th>Last Date</th><th>Usage Freq.</th><th>Next Cleaning</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="clTBody">${renderClientRows(clients)}</tbody>
       </table></div>
     </div>
@@ -4585,7 +4585,7 @@ function renderClients() {
 
 function renderClientRows(clients) {
   const now = new Date();
-  if (!clients.length) return '<tr><td colspan="8"><div class="empty"><div class="empty-ic">👥</div>No clients yet. Add old clients or sync bookings.</div></td></tr>';
+  if (!clients.length) return '<tr><td colspan="9"><div class="empty"><div class="empty-ic">👥</div>No clients yet. Add old clients or sync bookings.</div></td></tr>';
   return clients.map(function(c) {
     var next = c.nextCleaningDate ? new Date(c.nextCleaningDate) : null;
     var diff = next ? (next - now)/(1000*60*60*24) : 999;
@@ -4613,7 +4613,8 @@ function renderClientRows(clients) {
       '<td><strong>'+escH(c.name)+'</strong>'+(bl?renderBlacklistBadge(c.name,c.phone):'')+(c.email?'<div style="font-size:10.5px;color:var(--text-dim)">'+escH(c.email)+'</div>':'')+'</td>' +
       '<td>'+escH(c.phone||'—')+'</td>' +
       '<td style="font-size:12px;max-width:220px;word-wrap:break-word;white-space:normal">'+escH(c.address||'—')+(c.landmark?'<div style="font-size:10.5px;color:var(--gold);margin-top:3px"><strong>📍 Landmark:</strong> '+escH(c.landmark)+'</div>':'')+ renderLocationBadges(c.locationInfo)+'</td>' +
-      '<td style="font-size:12px">'+formatDate(c.lastServiceDate)+'<div style="font-size:10.5px;color:var(--text-dim)">'+escH(c.lastService||'—')+'</div></td>' +
+      '<td style="font-size:12px">'+escH(c.lastService||'—')+'</td>' +
+      '<td style="font-size:12px">'+(c.lastServiceDate?formatDate(c.lastServiceDate):'<span style="color:var(--text-dim)">—</span>')+'</td>' +
       '<td style="font-size:11.5px">'+(c.usage?escH(c.usage):'<span style="color:var(--text-dim)">Not set</span>')+'</td>' +
       '<td style="font-size:12px">'+(next?formatDate(c.nextCleaningDate):'—')+'</td>' +
       '<td><span class="status-badge '+sCls+'">'+sLbl+'</span></td>' +
