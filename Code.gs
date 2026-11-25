@@ -298,6 +298,30 @@ var HEADERS = {
   ],
   UnitSales: [
     'Sale ID','Date','Product ID','Qty','Unit Price','Total Price','Cost Price','Buyer','Phone','Notes','Sold By','Serial Number','Created At'
+  ],
+  InvestorDeposits: [
+    'Deposit ID','Investor ID','Date','Amount','Description','Method','Created At'
+  ],
+  ExpansionFund: [
+    'Entry ID','Date','Type','Amount','Description','Source','Created At'
+  ],
+  InvestorDistributions: [
+    'Distribution ID','Investor ID','Period','Amount','Type','Status','Date','Notes','Created At'
+  ],
+  PortalConfig: [
+    'Config Key','Config Value','Updated At'
+  ],
+  DailyExpenses: [
+    'Date','Expenses JSON','Updated At'
+  ],
+  ServiceAreas: [
+    'Area Name','Created At'
+  ],
+  AreaSchedule: [
+    'Area','Days JSON','Updated At'
+  ],
+  OpexCategories: [
+    'Category','Created At'
   ]
 };
 
@@ -324,7 +348,20 @@ var SHEET_STYLES = {
   ActivityLogSheet:{ bg: '#0d1f3c', fg: '#ffffff' },
   CommLog:         { bg: '#065f46', fg: '#ffffff' },
   BookingPhotos:   { bg: '#1e3a5f', fg: '#ffffff' },
-  CalendarNotes:   { bg: '#064e3b', fg: '#f59e0b' }
+  CalendarNotes:   { bg: '#064e3b', fg: '#f59e0b' },
+  Commissions:     { bg: '#1e3a5f', fg: '#f59e0b' },
+  PettyCash:       { bg: '#7f1d1d', fg: '#ffffff' },
+  Targets:         { bg: '#064e3b', fg: '#ffffff' },
+  ThirteenthMonth: { bg: '#065f46', fg: '#f59e0b' },
+  UnitSales:       { bg: '#0d1f3c', fg: '#f59e0b' },
+  InvestorDeposits:{ bg: '#064e3b', fg: '#ffffff' },
+  ExpansionFund:   { bg: '#065f46', fg: '#f59e0b' },
+  InvestorDistributions: { bg: '#1e3a5f', fg: '#ffffff' },
+  PortalConfig:    { bg: '#0d1f3c', fg: '#f59e0b' },
+  DailyExpenses:   { bg: '#7f1d1d', fg: '#f59e0b' },
+  ServiceAreas:    { bg: '#065f46', fg: '#ffffff' },
+  AreaSchedule:    { bg: '#064e3b', fg: '#f59e0b' },
+  OpexCategories:  { bg: '#1e3a5f', fg: '#ffffff' }
 };
 
 /* ─── TIME SLOTS ──────────────────────────────────────────── */
@@ -471,6 +508,25 @@ function doGet(e) {
         case 'getUnitSales':       result = getUnitSales();              break;
         case 'saveUnitSale':       result = saveUnitSale(params);        break;
         case 'deleteUnitSale':     result = deleteUnitSale(params);      break;
+        case 'getInvestorDeposits':  result = getInvestorDeposits();       break;
+        case 'saveInvestorDeposit':  result = saveInvestorDeposit(params); break;
+        case 'deleteInvestorDeposit':result = deleteInvestorDeposit(params);break;
+        case 'getExpansionFund':     result = getExpansionFund();          break;
+        case 'saveExpansionEntry':   result = saveExpansionEntry(params);  break;
+        case 'deleteExpansionEntry': result = deleteExpansionEntry(params);break;
+        case 'getInvestorDistributions': result = getInvestorDistributions(); break;
+        case 'saveInvestorDistribution': result = saveInvestorDistribution(params); break;
+        case 'deleteInvestorDistribution': result = deleteInvestorDistribution(params); break;
+        case 'getPortalConfig':     result = getPortalConfig();           break;
+        case 'savePortalConfig':    result = savePortalConfig(params);    break;
+        case 'getDailyExpenses':    result = getDailyExpenses();          break;
+        case 'saveDailyExpenses':   result = saveDailyExpenses(params);   break;
+        case 'getServiceAreas':     result = getServiceAreasAction();     break;
+        case 'saveServiceAreas':    result = saveServiceAreasAction(params); break;
+        case 'getAreaSchedule':     result = getAreaSchedule();           break;
+        case 'saveAreaSchedule':    result = saveAreaScheduleAction(params); break;
+        case 'getOpexCategories':   result = getOpexCategories();         break;
+        case 'saveOpexCategories':  result = saveOpexCategoriesAction(params); break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -2885,5 +2941,315 @@ function saveCalendarNotesAction(p) {
     sheet.getRange(2, 1, rows.length, 6).setValues(rows);
   }
   return { ok: true, count: dates.length };
+}
+
+/* ─── INVESTOR DEPOSITS ──────────────────────────────────── */
+function getInvestorDeposits() {
+  var sheet = getOrCreateSheet('InvestorDeposits');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    }
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveInvestorDeposit(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('InvestorDeposits');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r, 2).setValue(data.investorId || '');
+      sheet.getRange(r, 3).setValue(data.date || '');
+      sheet.getRange(r, 4).setValue(data.amount || 0);
+      sheet.getRange(r, 5).setValue(data.description || '');
+      sheet.getRange(r, 6).setValue(data.method || '');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('IDEP-' + new Date().getTime());
+  sheet.appendRow([id, data.investorId||'', data.date||'', data.amount||0, data.description||'', data.method||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deleteInvestorDeposit(p) {
+  var id = p.id;
+  if (!id) return { ok: false, error: 'Missing deposit ID' };
+  var sheet = getOrCreateSheet('InvestorDeposits');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { ok: true, action: 'deleted', id: id };
+    }
+  }
+  return { ok: false, error: 'Deposit not found: ' + id };
+}
+
+/* ─── EXPANSION FUND ─────────────────────────────────────── */
+function getExpansionFund() {
+  var sheet = getOrCreateSheet('ExpansionFund');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    }
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveExpansionEntry(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('ExpansionFund');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r, 2).setValue(data.date || '');
+      sheet.getRange(r, 3).setValue(data.type || '');
+      sheet.getRange(r, 4).setValue(data.amount || 0);
+      sheet.getRange(r, 5).setValue(data.description || '');
+      sheet.getRange(r, 6).setValue(data.source || '');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('EXP-' + new Date().getTime());
+  sheet.appendRow([id, data.date||'', data.type||'', data.amount||0, data.description||'', data.source||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deleteExpansionEntry(p) {
+  var id = p.id;
+  if (!id) return { ok: false, error: 'Missing entry ID' };
+  var sheet = getOrCreateSheet('ExpansionFund');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { ok: true, action: 'deleted', id: id };
+    }
+  }
+  return { ok: false, error: 'Expansion fund entry not found: ' + id };
+}
+
+/* ─── INVESTOR DISTRIBUTIONS ─────────────────────────────── */
+function getInvestorDistributions() {
+  var sheet = getOrCreateSheet('InvestorDistributions');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, records: [] };
+  var headers = data[0];
+  var records = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headerToKey(headers[j])] = cellToString(data[i][j]);
+    }
+    records.push(obj);
+  }
+  return { ok: true, records: records };
+}
+
+function saveInvestorDistribution(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var sheet = getOrCreateSheet('InvestorDistributions');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.id)) {
+      var r = i + 1;
+      sheet.getRange(r, 2).setValue(data.investorId || '');
+      sheet.getRange(r, 3).setValue(data.period || '');
+      sheet.getRange(r, 4).setValue(data.amount || 0);
+      sheet.getRange(r, 5).setValue(data.type || '');
+      sheet.getRange(r, 6).setValue(data.status || '');
+      sheet.getRange(r, 7).setValue(data.date || '');
+      sheet.getRange(r, 8).setValue(data.notes || '');
+      return { ok: true, action: 'updated', id: data.id };
+    }
+  }
+  var id = data.id || ('IDIST-' + new Date().getTime());
+  sheet.appendRow([id, data.investorId||'', data.period||'', data.amount||0, data.type||'', data.status||'', data.date||'', data.notes||'', now()]);
+  return { ok: true, action: 'created', id: id };
+}
+
+function deleteInvestorDistribution(p) {
+  var id = p.id;
+  if (!id) return { ok: false, error: 'Missing distribution ID' };
+  var sheet = getOrCreateSheet('InvestorDistributions');
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { ok: true, action: 'deleted', id: id };
+    }
+  }
+  return { ok: false, error: 'Distribution not found: ' + id };
+}
+
+/* ─── PORTAL CONFIG (Profit Split, Commission Rates, Petty Cash Config) ── */
+function getPortalConfig() {
+  var sheet = getOrCreateSheet('PortalConfig');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, config: {} };
+  var config = {};
+  for (var i = 1; i < data.length; i++) {
+    var key = String(data[i][0] || '');
+    var val = String(data[i][1] || '');
+    if (key) {
+      try { config[key] = JSON.parse(val); } catch(e) { config[key] = val; }
+    }
+  }
+  return { ok: true, config: config };
+}
+
+function savePortalConfig(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var key = data.key || '';
+  var value = data.value;
+  if (!key) return { ok: false, error: 'Missing config key' };
+  var sheet = getOrCreateSheet('PortalConfig');
+  var rows = sheet.getDataRange().getValues();
+  var valStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === key) {
+      sheet.getRange(i + 1, 2).setValue(valStr);
+      sheet.getRange(i + 1, 3).setValue(now());
+      return { ok: true, action: 'updated', key: key };
+    }
+  }
+  sheet.appendRow([key, valStr, now()]);
+  return { ok: true, action: 'created', key: key };
+}
+
+/* ─── DAILY EXPENSES ─────────────────────────────────────── */
+function getDailyExpenses() {
+  var sheet = getOrCreateSheet('DailyExpenses');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, expenses: {} };
+  var expenses = {};
+  for (var i = 1; i < data.length; i++) {
+    var date = String(data[i][0] || '');
+    var json = String(data[i][1] || '[]');
+    if (date) {
+      try { expenses[date] = JSON.parse(json); } catch(e) { expenses[date] = []; }
+    }
+  }
+  return { ok: true, expenses: expenses };
+}
+
+function saveDailyExpenses(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var date = data.date || '';
+  var items = data.items || [];
+  if (!date) return { ok: false, error: 'Missing date' };
+  var sheet = getOrCreateSheet('DailyExpenses');
+  var rows = sheet.getDataRange().getValues();
+  var json = JSON.stringify(items);
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === date) {
+      sheet.getRange(i + 1, 2).setValue(json);
+      sheet.getRange(i + 1, 3).setValue(now());
+      return { ok: true, action: 'updated', date: date };
+    }
+  }
+  sheet.appendRow([date, json, now()]);
+  return { ok: true, action: 'created', date: date };
+}
+
+/* ─── SERVICE AREAS ──────────────────────────────────────── */
+function getServiceAreasAction() {
+  var sheet = getOrCreateSheet('ServiceAreas');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, areas: [] };
+  var areas = [];
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][0] || '');
+    if (name) areas.push(name);
+  }
+  return { ok: true, areas: areas };
+}
+
+function saveServiceAreasAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var areas = data.areas || [];
+  var sheet = getOrCreateSheet('ServiceAreas');
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 2).clearContent();
+  var ts = now();
+  if (areas.length) {
+    var rows = areas.map(function(a) { return [a, ts]; });
+    sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+  }
+  return { ok: true, count: areas.length };
+}
+
+/* ─── AREA SCHEDULE ──────────────────────────────────────── */
+function getAreaSchedule() {
+  var sheet = getOrCreateSheet('AreaSchedule');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, schedule: {} };
+  var schedule = {};
+  for (var i = 1; i < data.length; i++) {
+    var area = String(data[i][0] || '');
+    var daysJson = String(data[i][1] || '[]');
+    if (area) {
+      try { schedule[area] = JSON.parse(daysJson); } catch(e) { schedule[area] = []; }
+    }
+  }
+  return { ok: true, schedule: schedule };
+}
+
+function saveAreaScheduleAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var schedule = data.schedule || {};
+  var sheet = getOrCreateSheet('AreaSchedule');
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  var ts = now();
+  var areas = Object.keys(schedule);
+  if (areas.length) {
+    var rows = areas.map(function(a) { return [a, JSON.stringify(schedule[a] || []), ts]; });
+    sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  }
+  return { ok: true, count: areas.length };
+}
+
+/* ─── OPEX CATEGORIES ────────────────────────────────────── */
+function getOpexCategories() {
+  var sheet = getOrCreateSheet('OpexCategories');
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, categories: [] };
+  var categories = [];
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][0] || '');
+    if (name) categories.push(name);
+  }
+  return { ok: true, categories: categories };
+}
+
+function saveOpexCategoriesAction(p) {
+  var data = p.data ? JSON.parse(decodeURIComponent(p.data)) : p;
+  var categories = data.categories || [];
+  var sheet = getOrCreateSheet('OpexCategories');
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 2).clearContent();
+  var ts = now();
+  if (categories.length) {
+    var rows = categories.map(function(c) { return [c, ts]; });
+    sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+  }
+  return { ok: true, count: categories.length };
 }
 

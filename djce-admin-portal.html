@@ -4026,6 +4026,7 @@ function getDailyExpenses(date){
 }
 function saveDailyExpenses(date,arr){
   try{var d=JSON.parse(localStorage.getItem('djce_daily_expenses')||'{}');d[date]=arr;localStorage.setItem('djce_daily_expenses',JSON.stringify(d));}catch(e){}
+  callSheets({action:'saveDailyExpenses',data:encodeURIComponent(JSON.stringify({date:date,items:arr}))}).catch(function(e){console.log('Daily expenses sync error:',e);});
 }
 function addDailyExpense(date){
   var type=document.getElementById('dexp_type')?.value||'Helper';
@@ -4763,9 +4764,11 @@ function promptAddServiceArea(){
   SERVICE_AREAS.push(name);
   SERVICE_AREAS.sort();
   saveServiceAreas();
+  callSheets({action:'saveServiceAreas',data:encodeURIComponent(JSON.stringify({areas:SERVICE_AREAS}))}).catch(function(e){console.log('Service areas sync error:',e);});
   // Also add to AREA_SCHEDULE with empty days
   if(!AREA_SCHEDULE[name]) AREA_SCHEDULE[name]=[];
   saveAreaSchedule();
+  callSheets({action:'saveAreaSchedule',data:encodeURIComponent(JSON.stringify({schedule:AREA_SCHEDULE}))}).catch(function(e){console.log('Area schedule sync error:',e);});
   showToast(name+' added! ✅','success');
   // Re-render
   var view=document.getElementById('view-schedule');
@@ -4777,8 +4780,11 @@ function removeServiceArea(name){
   if(!confirm('Remove "'+name+'" from Service Areas?')) return;
   SERVICE_AREAS=SERVICE_AREAS.filter(function(a){return a!==name;});
   saveServiceAreas();
+  callSheets({action:'saveServiceAreas',data:encodeURIComponent(JSON.stringify({areas:SERVICE_AREAS}))}).catch(function(e){console.log('Service areas sync error:',e);});
   // Also remove from AREA_SCHEDULE
-  if(AREA_SCHEDULE[name]){delete AREA_SCHEDULE[name]; saveAreaSchedule();}
+  if(AREA_SCHEDULE[name]){delete AREA_SCHEDULE[name]; saveAreaSchedule();
+    callSheets({action:'saveAreaSchedule',data:encodeURIComponent(JSON.stringify({schedule:AREA_SCHEDULE}))}).catch(function(e){console.log('Area schedule sync error:',e);});
+  }
   showToast(name+' removed','success');
   var view=document.getElementById('view-schedule');
   if(view) view.innerHTML=renderView('schedule');
@@ -4791,6 +4797,7 @@ function toggleAreaDay(area, day){
   if(idx===-1){ AREA_SCHEDULE[area].push(day); }
   else { AREA_SCHEDULE[area].splice(idx,1); }
   saveAreaSchedule();
+  callSheets({action:'saveAreaSchedule',data:encodeURIComponent(JSON.stringify({schedule:AREA_SCHEDULE}))}).catch(function(e){console.log('Area schedule sync error:',e);});
   // Re-render just the editor
   var view=document.getElementById('view-schedule');
   if(view) view.innerHTML=renderView('schedule');
@@ -5794,6 +5801,7 @@ function toggleAreaDay(area, day){
   var order=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   AREA_SCHEDULE[area].sort(function(a,b){ return order.indexOf(a)-order.indexOf(b); });
   saveAreaSchedule();
+  callSheets({action:'saveAreaSchedule',data:encodeURIComponent(JSON.stringify({schedule:AREA_SCHEDULE}))}).catch(function(e){console.log('Area schedule sync error:',e);});
   // Re-render logistics
   var view = document.getElementById('view-logistics');
   if(view) view.innerHTML = renderView('logistics');
@@ -7836,6 +7844,7 @@ function saveNewCategory(){
     if(OPEX_CATEGORIES.indexOf(name)!==-1){ showToast('"'+name+'" already exists','warning'); return; }
     OPEX_CATEGORIES.push(name);
     try { localStorage.setItem('djce_opex_categories', JSON.stringify(OPEX_CATEGORIES)); } catch(e){}
+    callSheets({action:'saveOpexCategories',data:encodeURIComponent(JSON.stringify({categories:OPEX_CATEGORIES}))}).catch(function(e){console.log('OPEX categories sync error:',e);});
     closeModal('expenseModal');
     showToast('Added operation category: '+name,'success');
     refreshRevenue();
@@ -7938,6 +7947,7 @@ function savePayslipToEmployee() {
   emp.mealAllowance = newFood;
 
   saveAcctData();
+  callSheets({action:'saveEmployee',data:encodeURIComponent(JSON.stringify(emp))}).catch(function(e){console.log('Employee sync error:',e);});
   showToast('Employee details saved!','success');
 }
 
@@ -9135,6 +9145,8 @@ function saveEmployee(editId) {
     ACCT_EMPLOYEES.push(data);
   }
   saveAcctData();
+  var empToSync = editId ? ACCT_EMPLOYEES.find(function(x){return x.id===editId;}) : data;
+  if(empToSync) callSheets({action:'saveEmployee',data:encodeURIComponent(JSON.stringify(empToSync))}).catch(function(e){console.log('Employee sync error:',e);});
   closeModal('expenseModal');
   switchView('accounting');
   showToast(editId?'Employee updated':'Employee added','success');
@@ -9145,6 +9157,7 @@ function deleteEmployee(id) {
   confirm2('Delete Employee','Delete this employee?','🗑️',function(){
     ACCT_EMPLOYEES = ACCT_EMPLOYEES.filter(function(x){return x.id!==id;});
     saveAcctData();
+    callSheets({action:'deleteEmployee',id:id}).catch(function(e){console.log('Employee delete sync error:',e);});
     switchView('accounting');
     showToast('Employee removed','info');
   });
@@ -9254,6 +9267,10 @@ function saveDailyAudit(dateStr) {
     saved++;
   });
   saveAcctData();
+  // Sync daily log entries for this date to Sheets
+  ACCT_DAILY_LOG.filter(function(l){return l.date===dateStr;}).forEach(function(rec){
+    callSheets({action:'saveDailyRecord',data:encodeURIComponent(JSON.stringify(rec))}).catch(function(e){console.log('Daily record sync error:',e);});
+  });
   switchAcctTab('daily');
   showToast('Audit saved for '+formatDate(dateStr)+' ('+saved+' entries)','success');
   logActivity('📋','Daily audit saved for '+dateStr,'accounting');
@@ -9955,6 +9972,7 @@ function saveDistribution() {
   function doSave() {
     INVESTOR_DISTRIBUTIONS.push(entry);
     saveAcctData();
+    callSheets({action:'saveInvestorDistribution',data:encodeURIComponent(JSON.stringify(entry))}).catch(function(e){console.log('Distribution sync error:',e);});
     closeModal('expenseModal');
     var inv = ACCT_INVESTORS.find(function(i){return i.id===investorId;});
     showToast('Distribution recorded for '+(inv?inv.name:'investor'),'success');
@@ -9974,6 +9992,7 @@ function releaseDistribution(id) {
   function doRelease() {
     d.status = 'released';
     saveAcctData();
+    callSheets({action:'saveInvestorDistribution',data:encodeURIComponent(JSON.stringify(d))}).catch(function(e){console.log('Distribution sync error:',e);});
     var inv = ACCT_INVESTORS.find(function(i){return i.id===d.investorId;});
     showToast('Distribution released!','success');
     logActivity('✅','Released distribution: ₱'+(parseFloat(d.amount)||0).toLocaleString()+' to '+(inv?inv.name:d.investorId),'finance');
@@ -9990,6 +10009,7 @@ function deleteDistribution(id) {
   if (!confirm('Delete this distribution record?')) return;
   INVESTOR_DISTRIBUTIONS = INVESTOR_DISTRIBUTIONS.filter(function(x){return x.id!==id;});
   saveAcctData();
+  callSheets({action:'deleteInvestorDistribution',id:id}).catch(function(e){console.log('Distribution delete sync error:',e);});
   showToast('Distribution deleted','info');
   switchView('accounting');
 }
@@ -10022,6 +10042,7 @@ function saveExpFund() {
   };
   EXPANSION_FUND.push(entry);
   saveAcctData();
+  callSheets({action:'saveExpansionEntry',data:encodeURIComponent(JSON.stringify(entry))}).catch(function(e){console.log('Expansion fund sync error:',e);});
   closeModal('expenseModal');
   showToast('Expansion fund '+entry.type+' recorded','success');
   logActivity('🏗️','Expansion fund '+entry.type+': ₱'+amount.toLocaleString(),'finance');
@@ -10032,6 +10053,7 @@ function deleteExpFund(id) {
   if (!confirm('Delete this expansion fund entry?')) return;
   EXPANSION_FUND = EXPANSION_FUND.filter(function(x){return x.id!==id;});
   saveAcctData();
+  callSheets({action:'deleteExpansionEntry',id:id}).catch(function(e){console.log('Expansion fund delete sync error:',e);});
   showToast('Entry deleted','info');
   switchView('accounting');
 }
@@ -10047,6 +10069,10 @@ function reconcileYear(yr) {
   });
   if (count===0) { showToast('No provisional distributions to reconcile for '+yr,'info'); return; }
   saveAcctData();
+  // Sync all updated distributions to Sheets
+  INVESTOR_DISTRIBUTIONS.filter(function(d){return d.period&&d.period.startsWith(yr)&&d.type==='actual';}).forEach(function(d){
+    callSheets({action:'saveInvestorDistribution',data:encodeURIComponent(JSON.stringify(d))}).catch(function(e){console.log('Distribution sync error:',e);});
+  });
   showToast(count+' distribution'+(count!==1?'s':'')+' reconciled to actual for '+yr,'success');
   logActivity('📋','Year-end reconciliation: '+count+' distributions finalized for '+yr,'finance');
   switchView('accounting');
@@ -10085,6 +10111,8 @@ function saveInvestor(editId) {
     ACCT_INVESTORS.push(data);
   }
   saveAcctData();
+  var invToSync = editId ? ACCT_INVESTORS.find(function(x){return x.id===editId;}) : data;
+  if(invToSync) callSheets({action:'saveInvestor',data:encodeURIComponent(JSON.stringify({id:invToSync.id,investorName:invToSync.name,sharePercent:invToSync.percentage,notes:invToSync.notes}))}).catch(function(e){console.log('Investor sync error:',e);});
   closeModal('expenseModal');
   switchAcctTab('investors');
   showToast(editId?'Investor updated':'Investor added','success');
@@ -10094,6 +10122,7 @@ function deleteInvestor(id) {
   if (!confirm('Delete this investor?')) return;
   ACCT_INVESTORS = ACCT_INVESTORS.filter(function(x){return x.id!==id;});
   saveAcctData();
+  callSheets({action:'deleteInvestor',id:id}).catch(function(e){console.log('Investor delete sync error:',e);});
   switchAcctTab('investors');
   showToast('Investor removed','info');
 }
@@ -10121,8 +10150,10 @@ function saveDeposit() {
   var method = document.getElementById('dep_method').value;
   var desc = (document.getElementById('dep_desc').value||'').trim();
   if (!invId||!date||!amt||amt<=0) { showToast('Fill in investor, date, and amount','error'); return; }
-  INVESTOR_DEPOSITS.push({ id:'DEP-'+Date.now(), investorId:invId, date:date, amount:amt, description:desc, method:method });
+  var depEntry = { id:'DEP-'+Date.now(), investorId:invId, date:date, amount:amt, description:desc, method:method };
+  INVESTOR_DEPOSITS.push(depEntry);
   saveAcctData();
+  callSheets({action:'saveInvestorDeposit',data:encodeURIComponent(JSON.stringify(depEntry))}).catch(function(e){console.log('Deposit sync error:',e);});
   closeModal();
   var inv = ACCT_INVESTORS.find(function(i){return i.id===invId;});
   showToast('Deposit recorded: ₱'+amt.toLocaleString()+' from '+(inv?inv.name:'investor'),'success');
@@ -10134,6 +10165,7 @@ function deleteDeposit(id) {
   if (!confirm('Delete this deposit record?')) return;
   INVESTOR_DEPOSITS = INVESTOR_DEPOSITS.filter(function(x){return x.id!==id;});
   saveAcctData();
+  callSheets({action:'deleteInvestorDeposit',id:id}).catch(function(e){console.log('Deposit delete sync error:',e);});
   switchAcctTab('investors');
   showToast('Deposit deleted','info');
 }
@@ -10559,6 +10591,7 @@ function saveCommissionRates() {
   if (isNaN(n)||isNaN(r)||isNaN(f)||n<0||r<0||f<0||n>100||r>100||f>100) { showToast('Enter valid percentages (0–100)','error'); return; }
   COMMISSION_RATES = { newClient: n, repeatClient: r, followUpCleaning: f };
   localStorage.setItem('djce_commission_rates', JSON.stringify(COMMISSION_RATES));
+  callSheets({action:'savePortalConfig',data:encodeURIComponent(JSON.stringify({key:'commissionRates',value:COMMISSION_RATES}))}).catch(function(e){console.log('Commission rates sync error:',e);});
   showToast('Commission rates saved!','success');
 }
 
@@ -10567,6 +10600,7 @@ function savePettyCashConfig() {
   if (isNaN(a)||a<0) { showToast('Enter a valid amount','error'); return; }
   PETTY_CASH_CONFIG.monthlyAllocation = a;
   localStorage.setItem('djce_petty_cash_config', JSON.stringify(PETTY_CASH_CONFIG));
+  callSheets({action:'savePortalConfig',data:encodeURIComponent(JSON.stringify({key:'pettyCashConfig',value:PETTY_CASH_CONFIG}))}).catch(function(e){console.log('Petty cash config sync error:',e);});
   showToast('Petty cash budget updated!','success');
 }
 
@@ -10577,6 +10611,7 @@ function saveProfitSplit() {
   if (Math.round(inv+biz)!==100) { showToast('Investor + Business must equal 100%','error'); return; }
   PROFIT_SPLIT = { investorPct: inv, businessPct: biz };
   localStorage.setItem('djce_profit_split', JSON.stringify(PROFIT_SPLIT));
+  callSheets({action:'savePortalConfig',data:encodeURIComponent(JSON.stringify({key:'profitSplit',value:PROFIT_SPLIT}))}).catch(function(e){console.log('Profit split sync error:',e);});
   showToast('Profit split saved! ('+inv+'% / '+biz+'%)','success');
 }
 
@@ -11925,6 +11960,110 @@ async function fetchFromSheets() {
         });
       }
     } catch(e) { console.log('Unit sales sync skipped:', e); }
+
+    // 28. Investor Deposits
+    try {
+      const idepData = await callSheets({ action: 'getInvestorDeposits' });
+      if (idepData && idepData.ok && idepData.records && idepData.records.length) {
+        idepData.records.forEach(function(r){
+          r.id = r.depositId || r.id;
+          if (!INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;})) INVESTOR_DEPOSITS.push(r);
+          else Object.assign(INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;}), r);
+        });
+        saveAcctData();
+      }
+    } catch(e) { console.log('Investor deposits sync skipped:', e); }
+
+    // 29. Expansion Fund
+    try {
+      const efData = await callSheets({ action: 'getExpansionFund' });
+      if (efData && efData.ok && efData.records && efData.records.length) {
+        efData.records.forEach(function(r){
+          r.id = r.entryId || r.id;
+          if (!EXPANSION_FUND.find(function(x){return x.id===r.id;})) EXPANSION_FUND.push(r);
+          else Object.assign(EXPANSION_FUND.find(function(x){return x.id===r.id;}), r);
+        });
+        saveAcctData();
+      }
+    } catch(e) { console.log('Expansion fund sync skipped:', e); }
+
+    // 30. Investor Distributions
+    try {
+      const idistData = await callSheets({ action: 'getInvestorDistributions' });
+      if (idistData && idistData.ok && idistData.records && idistData.records.length) {
+        idistData.records.forEach(function(r){
+          r.id = r.distributionId || r.id;
+          if (!INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;})) INVESTOR_DISTRIBUTIONS.push(r);
+          else Object.assign(INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;}), r);
+        });
+        saveAcctData();
+      }
+    } catch(e) { console.log('Investor distributions sync skipped:', e); }
+
+    // 31. Portal Config (Commission Rates, Petty Cash Config, Profit Split)
+    try {
+      const cfgData = await callSheets({ action: 'getPortalConfig' });
+      if (cfgData && cfgData.ok && cfgData.config) {
+        if (cfgData.config.commissionRates) {
+          COMMISSION_RATES = cfgData.config.commissionRates;
+          try { localStorage.setItem('djce_commission_rates', JSON.stringify(COMMISSION_RATES)); } catch(e){}
+        }
+        if (cfgData.config.pettyCashConfig) {
+          PETTY_CASH_CONFIG = cfgData.config.pettyCashConfig;
+          try { localStorage.setItem('djce_petty_cash_config', JSON.stringify(PETTY_CASH_CONFIG)); } catch(e){}
+        }
+        if (cfgData.config.profitSplit) {
+          PROFIT_SPLIT = cfgData.config.profitSplit;
+          try { localStorage.setItem('djce_profit_split', JSON.stringify(PROFIT_SPLIT)); } catch(e){}
+        }
+      }
+    } catch(e) { console.log('Portal config sync skipped:', e); }
+
+    // 32. Daily Expenses
+    try {
+      const dexpData = await callSheets({ action: 'getDailyExpenses' });
+      if (dexpData && dexpData.ok && dexpData.expenses && Object.keys(dexpData.expenses).length) {
+        var existingDE = {};
+        try { existingDE = JSON.parse(localStorage.getItem('djce_daily_expenses')||'{}'); } catch(e){}
+        Object.keys(dexpData.expenses).forEach(function(date){
+          existingDE[date] = dexpData.expenses[date];
+        });
+        try { localStorage.setItem('djce_daily_expenses', JSON.stringify(existingDE)); } catch(e){}
+      }
+    } catch(e) { console.log('Daily expenses sync skipped:', e); }
+
+    // 33. Service Areas
+    try {
+      const saData = await callSheets({ action: 'getServiceAreas' });
+      if (saData && saData.ok && saData.areas && saData.areas.length) {
+        SERVICE_AREAS.length = 0;
+        saData.areas.forEach(function(a){ SERVICE_AREAS.push(a); });
+        SERVICE_AREAS.sort();
+        saveServiceAreas();
+      }
+    } catch(e) { console.log('Service areas sync skipped:', e); }
+
+    // 34. Area Schedule
+    try {
+      const asData = await callSheets({ action: 'getAreaSchedule' });
+      if (asData && asData.ok && asData.schedule && Object.keys(asData.schedule).length) {
+        Object.keys(asData.schedule).forEach(function(area){
+          AREA_SCHEDULE[area] = asData.schedule[area];
+        });
+        saveAreaSchedule();
+      }
+    } catch(e) { console.log('Area schedule sync skipped:', e); }
+
+    // 35. OPEX Categories
+    try {
+      const opexData = await callSheets({ action: 'getOpexCategories' });
+      if (opexData && opexData.ok && opexData.categories && opexData.categories.length) {
+        opexData.categories.forEach(function(c){
+          if (OPEX_CATEGORIES.indexOf(c)===-1) OPEX_CATEGORIES.push(c);
+        });
+        try { localStorage.setItem('djce_opex_categories', JSON.stringify(OPEX_CATEGORIES)); } catch(e){}
+      }
+    } catch(e) { console.log('OPEX categories sync skipped:', e); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';
