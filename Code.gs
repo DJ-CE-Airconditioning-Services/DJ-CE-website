@@ -957,15 +957,26 @@ function saveAccount(p) {
       if (data.lastPwChange) sheet.getRange(i+1,6).setValue(data.lastPwChange);
       if (data.forceChange !== undefined) sheet.getRange(i+1,7).setValue(data.forceChange);
       if (data.lastLogin)    sheet.getRange(i+1,9).setValue(data.lastLogin);
-      if (data.pin !== undefined) sheet.getRange(i+1,10).setValue(data.pin);
+      if (data.pin !== undefined) {
+        var pinCell = sheet.getRange(i+1,10);
+        pinCell.setNumberFormat('@'); // Force text format to preserve leading zeros
+        pinCell.setValue(String(data.pin));
+      }
       return { ok: true, action: 'updated', username: data.username };
     }
   }
-  sheet.appendRow([
+  var newRow = sheet.appendRow([
     data.username, data.password||'', data.name||'', data.role||'',
     data.avatar||'?', data.lastPwChange||'', data.forceChange||'false',
     now(), '', data.pin||''
   ]);
+  // Force text format on PIN column to preserve leading zeros
+  if (data.pin) {
+    var lastRow = sheet.getLastRow();
+    var pinCell = sheet.getRange(lastRow, 10);
+    pinCell.setNumberFormat('@');
+    pinCell.setValue(String(data.pin));
+  }
   return { ok: true, action: 'created', username: data.username };
 }
 

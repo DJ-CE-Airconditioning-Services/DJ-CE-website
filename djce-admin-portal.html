@@ -1125,7 +1125,13 @@ function _applySheetAccounts(res) {
         USERS[u] = acc;
       } else {
         // Password stays server-side; PIN syncs for cross-device unlock
-        if (acc.pin) USERS[u].pin = acc.pin;
+        if (acc.pin) {
+          var pinStr = String(acc.pin);
+          while (pinStr.length < 4) pinStr = '0' + pinStr;
+          USERS[u].pin = pinStr;
+          // Also save to localStorage as backup for instant access on next login
+          try { localStorage.setItem('djce_pin_' + u, pinStr); } catch(e){}
+        }
         if (acc.name) USERS[u].name = acc.name;
         if (acc.role) USERS[u].role = acc.role;
         if (acc.avatar) USERS[u].avatar = acc.avatar;
@@ -1906,16 +1912,16 @@ function showPortal() {
   switchView(session.role==='mama'?'mama-commissions':'dashboard');
   fetchFromSheets();
   startAutoSync();
-  // PIN: if PIN is set, lock immediately on load; if not, ask to set one
+  // PIN: wait for account sync (PIN from Sheets) before checking
   startActivityListeners();
-  setTimeout(function(){
+  _waitForPinReady(function(){
     if (getStoredPin()) {
       lockPortal();
     } else {
       // First time — prompt to set PIN
       showPinSetup();
     }
-  }, 600);
+  });
 }
 
 function getRoleLabel(r) {
@@ -14269,13 +14275,33 @@ var _setupStep      = 1; // 1=enter new, 2=confirm
 var _pinAttempts    = 0;
 var MAX_PIN_ATTEMPTS = 5;
 
+/* ── Wait for account sync before PIN check ── */
+function _waitForPinReady(cb) {
+  // If account sync already done or PIN already in USERS/localStorage, proceed fast
+  if (_accountSyncDone || getStoredPin()) { setTimeout(cb, 300); return; }
+  // Wait for the account sync promise (PIN comes from Sheets)
+  if (_accountSyncPromise) {
+    var done = false;
+    _accountSyncPromise.then(function(){ if(!done){done=true; setTimeout(cb,100);} })
+      .catch(function(){ if(!done){done=true; setTimeout(cb,100);} });
+    // Safety timeout — don't wait forever (5 seconds max)
+    setTimeout(function(){ if(!done){done=true; cb();} }, 5000);
+  } else {
+    // No promise yet — wait a bit then proceed
+    setTimeout(cb, 1500);
+  }
+}
+
 /* ── Helpers ── */
 function getPinKey() { return 'djce_pin_'+(session?session.username:''); }
 
 function getStoredPin() {
   // Read from USERS object (synced with Sheets), fallback to old localStorage
   if (session && USERS[session.username] && USERS[session.username].pin) {
-    return USERS[session.username].pin;
+    // Ensure PIN is always a 4-digit string (Sheets may strip leading zeros)
+    var p = String(USERS[session.username].pin);
+    while (p.length < 4) p = '0' + p;
+    return p;
   }
   try {
     var old = localStorage.getItem(getPinKey()) || '';
