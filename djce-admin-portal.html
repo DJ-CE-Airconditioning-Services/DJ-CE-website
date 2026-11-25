@@ -13141,6 +13141,8 @@ function editClientModal(id){
     '</div>'+
     '<div id="ec_svcFields"></div>'+
     '<div class="form-grid" style="margin-top:10px">'+
+    '<div class="field"><label>📅 Last Service Date</label><input type="date" id="ec_lastDate" value="'+(c.lastServiceDate||'')+'"></div>'+
+    '<div class="field"><label>📅 Next Cleaning Date</label><input type="date" id="ec_nextDate" value="'+(c.nextCleaningDate||'')+'"></div>'+
     '<div class="field"><label>AC Usage Frequency</label><select id="ec_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(function(u){return '<option'+(c.usage===u.label?' selected':'')+'>'+u.label+'</option>';}).join('')+
     '</select></div>'+
@@ -13183,6 +13185,10 @@ function saveEditClient(){
   var serviceName=validSvc.map(function(e){return e.service;}).join(', ')||CLIENTS[id]?.lastService||'';
   var earliestNext='';
   validSvc.forEach(function(e){if(e.nextdate){if(!earliestNext||e.nextdate<earliestNext) earliestNext=e.nextdate;}});
+  // Date fields from edit form
+  var ecLastDate = document.getElementById('ec_lastDate')?.value||'';
+  var ecNextDate = document.getElementById('ec_nextDate')?.value||'';
+  var ecAmount = document.getElementById('ec_amount')?.value||'';
   // Track old client data before saving (for updating bookings)
   var oldClient = CLIENTS[id] ? Object.assign({}, CLIENTS[id]) : null;
   if(!id||!CLIENTS[id]){
@@ -13195,11 +13201,13 @@ function saveEditClient(){
     address:document.getElementById('ec_address')?.value||'',
     landmark:document.getElementById('ec_landmark')?.value||'',
     lastService:serviceName,
+    lastServiceDate:ecLastDate||CLIENTS[id]?.lastServiceDate||'',
     serviceDetails:fields, serviceDetailsSummary:summary,
     usage:usage,
+    lastAmount:ecAmount||CLIENTS[id]?.lastAmount||'',
     notes:getNotesContent('ec_notes'),
     locationInfo:getLocationInfo('ec'),
-    nextCleaningDate:earliestNext||CLIENTS[id]?.nextCleaningDate||'',
+    nextCleaningDate:ecNextDate||earliestNext||CLIENTS[id]?.nextCleaningDate||'',
     source:source, createdAt:CLIENTS[id]?.createdAt||new Date().toISOString()
   };
   // Sync client details → matching bookings (by phone or old name)
