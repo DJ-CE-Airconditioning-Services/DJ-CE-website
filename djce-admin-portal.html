@@ -11608,6 +11608,7 @@ function callSheets(params, timeout, _retryMode) {
 async function fetchFromSheets() {
   const btn = document.getElementById('syncBtn');
   if (btn) btn.textContent = '⟳ Syncing...';
+  var syncStart = Date.now();
 
   try {
     // 0. Auto-fix sheet headers once per session
@@ -11616,488 +11617,312 @@ async function fetchFromSheets() {
         var fixRes = await callSheets({ action: 'fixBookingHeaders' });
         if (fixRes && fixRes.ok) {
           window._headersFixed = true;
-          if (fixRes.note && fixRes.note.indexOf('fixed') >= 0) {
-            console.log('Sheet headers fixed:', fixRes);
-          }
+          if (fixRes.note && fixRes.note.indexOf('fixed') >= 0) console.log('Sheet headers fixed:', fixRes);
         }
       } catch(hErr) { console.log('Header fix skipped:', hErr); }
     }
 
-    // 1. Bookings
-    const bkData = await callSheets({ action: 'getBookings' });
-    if (bkData && bkData.ok && bkData.bookings) {
-      bkData.bookings.forEach(function(b) {
-        // Normalize field names from Sheets
-        const id = (b.bookingId || b.id || '').trim();
-        if (!id) return;
-        const normalized = {
-          id: id,
-          refNo: (b.refNo || '').trim(),
-          name: (b.name || '').trim(),
-          phone: (b.phone || '').trim(),
-          email: (b.email || '').trim(),
-          houseNo: (b.houseNo || '').trim(),
-          street: (b.street || '').trim(),
-          barangay: (b.barangay || '').trim(),
-          city: (b.city || '').trim(),
-          address: (b.fullAddress || b.address || '').trim(),
-          landmark: (b.landmark || '').trim(),
-          lat: (b.lat || '').trim(),
-          lng: (b.lng || '').trim(),
-          service: (b.service || b.services || '').trim(),
-          serviceDetails: (b.serviceDetails || '').trim(),
-          date: (b.date || '').toString().substring(0,10).trim(),
-          time: (b.timeSlot || b.time || '').trim(),
-          technician: (b.technician || b.assignedTo || b.assigned || '').trim(),
-          status: (b.status || 'Pending').trim(),
-          amount: (b.amount || '').trim(),
-          feeService: (b.feeService || '').trim(),
-          feeParts: (b.feeParts || '').trim(),
-          feeTranspo: (b.feeTranspo || '').trim(),
-          feeOther: (b.feeOther || '').trim(),
-          feeDiscount: (b.feeDiscount || '').trim(),
-          usage: (b.usageFrequency || b.usage || '').trim(),
-          nextCleaningDate: (b.nextCleaningDate || '').trim(),
-          notes: (b.notes || '').trim(),
-          source: (b.source || 'website').trim(),
-          followedUp: (b.followedUp || '').trim(),
-          completedAt: (b.completedAt || '').trim(),
-          createdAt: (b.createdAt || '').trim(),
-          _synced: true
-        };
-        // Fix (b): Sanitize date — Google Sheets may return "2.15" for Feb 15
-        if (normalized.date && !/^\d{4}-\d{2}-\d{2}/.test(normalized.date)) {
-          // Try M.DD or M/DD pattern (e.g. "2.15" → "2025-02-15")
-          var dm = normalized.date.match(/^(\d{1,2})[\.\/](\d{1,2})$/);
-          if (dm) {
-            var yr = new Date().getFullYear();
-            normalized.date = yr + '-' + String(dm[1]).padStart(2,'0') + '-' + String(dm[2]).padStart(2,'0');
-          }
-          // Try MM/DD/YYYY or M/D/YYYY
-          var mdy = normalized.date.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{2,4})$/);
-          if (mdy) {
-            var y = mdy[3].length === 2 ? '20' + mdy[3] : mdy[3];
-            normalized.date = y + '-' + String(mdy[1]).padStart(2,'0') + '-' + String(mdy[2]).padStart(2,'0');
-          }
-        }
-        // Fix (b): Detect swapped name/address — if name looks like address and address looks like name
-        if (normalized.name && /\d{4}-\d{2}-\d{2}|^\d+\s+(st|nd|rd|th|street|ave|blvd)/i.test(normalized.name)) {
-          // name field has a date or address pattern — check if address has the real name
-          if (normalized.address && !/\d/.test(normalized.address.substring(0,3))) {
-            var tmp = normalized.name;
-            normalized.name = normalized.address;
-            normalized.address = tmp;
-          }
-        }
-        if (!BOOKINGS[id]) {
-          // Check for duplicate by matching name+phone+date+service (different IDs, same booking)
-          var isDupe = Object.values(BOOKINGS).some(function(existing) {
-            return existing.name === normalized.name
-              && existing.phone === normalized.phone
-              && existing.date === normalized.date
-              && existing.service === normalized.service
-              && existing.id !== id;
-          });
-          if (!isDupe) {
-            BOOKINGS[id] = normalized;
-          }
-        } else if (BOOKINGS[id]._dirty) {
-          BOOKINGS[id].name = normalized.name || BOOKINGS[id].name;
-          BOOKINGS[id].phone = normalized.phone || BOOKINGS[id].phone;
-          BOOKINGS[id].email = normalized.email || BOOKINGS[id].email;
-          BOOKINGS[id].address = normalized.address || BOOKINGS[id].address;
-          BOOKINGS[id].landmark = normalized.landmark || BOOKINGS[id].landmark;
-          BOOKINGS[id].service = normalized.service || BOOKINGS[id].service;
-          BOOKINGS[id].serviceDetails = normalized.serviceDetails || BOOKINGS[id].serviceDetails;
-          BOOKINGS[id].date = normalized.date || BOOKINGS[id].date;
-          BOOKINGS[id].time = normalized.time || BOOKINGS[id].time;
-          BOOKINGS[id].source = normalized.source || BOOKINGS[id].source;
-          BOOKINGS[id].createdAt = normalized.createdAt || BOOKINGS[id].createdAt;
-          BOOKINGS[id]._synced = true;
-        } else {
-          Object.assign(BOOKINGS[id], normalized);
-        }
-      });
+    // Try bulk fetch (1 request instead of 35)
+    var bulk = null;
+    try { bulk = await callSheets({ action: 'bulkFetch' }, 60000); } catch(e) { console.log('Bulk fetch failed, falling back:', e); }
+
+    if (bulk && bulk.ok && bulk.data) {
+      var d = bulk.data;
+      console.log('✅ Bulk fetch received in ' + ((Date.now()-syncStart)/1000).toFixed(1) + 's');
+
+      // Process all data from bulk response
+      _processBulkBookings(d.bookings);
+      _processBulkAccounts(d.accounts);
+      _processBulkClients(d.clients);
+      _processBulkComplaints(d.complaints);
+      _processBulkExpenses(d.expenses);
+      _processBulkSlots(d.slots);
+      _processBulkWaitlist(d.waitlist);
+      _processBulkHouseholdBudgets(d.householdBudgets);
+      _processBulkTranspoFees(d.transpoFees);
+      _processBulkInventory(d.inventory);
+      _processBulkFeedback(d.feedback);
+      _processBulkWarrantyLog(d.warrantyLog);
+      _processBulkTimeCorrections(d.timeCorrections);
+      _processBulkBlacklist(d.blacklist);
+      _processBulkEmployees(d.employees);
+      _processBulkActivityLog(d.activityLog);
+      _processBulkCommLog(d.commLog);
+      _processBulkBookingPhotos(d.bookingPhotos);
+      _processBulkDailyTracker(d.dailyTracker);
+      _processBulkPayroll(d.payroll);
+      _processBulkInvestors(d.investors);
+      _processBulkCalendarNotes(d.calendarNotes);
+      _processBulkCommissions(d.commissions);
+      _processBulkPettyCash(d.pettyCash);
+      _processBulkTargets(d.targets);
+      _processBulk13thMonth(d.thirteenthMonth);
+      _processBulkUnitSales(d.unitSales);
+      _processBulkInvestorDeposits(d.investorDeposits);
+      _processBulkExpansionFund(d.expansionFund);
+      _processBulkInvestorDistributions(d.investorDistributions);
+      _processBulkPortalConfig(d.portalConfig);
+      _processBulkDailyExpenses(d.dailyExpenses);
+      _processBulkServiceAreas(d.serviceAreas);
+      _processBulkAreaSchedule(d.areaSchedule);
+      _processBulkOpexCategories(d.opexCategories);
+
+    } else {
+      // Fallback: sequential fetch (old method, for backward compatibility)
+      console.log('⚠️ Bulk fetch unavailable, using sequential sync...');
+      await _fetchFromSheetsFallback();
     }
-
-    // 2. Accounts (sync from Sheets — source of truth for password/forceChange/PIN)
-    if (session) {
-      await loadAccountsFromSheets();
-    }
-
-    // 3. Clients — sync both ways: add new from sheets, remove deleted from sheets
-    const clData = await callSheets({ action: 'getClients' });
-    if (clData && clData.ok && clData.clients) {
-      const sheetClientIds = new Set();
-      clData.clients.forEach(function(c) {
-        const id = c.clientId || c.id;
-        if (!id) return;
-        c.id = id;
-        sheetClientIds.add(id);
-        if (!CLIENTS[id]) { c._synced = true; CLIENTS[id] = c; }
-        else { CLIENTS[id]._synced = true; }
-      });
-      // Remove clients that were deleted from sheets (only sheet-sourced ones)
-      Object.keys(CLIENTS).forEach(function(k) {
-        if (CLIENTS[k] && CLIENTS[k]._synced && !sheetClientIds.has(k)) {
-          delete CLIENTS[k];
-        }
-      });
-    }
-
-    // 4. Complaints
-    const cmpData = await callSheets({ action: 'getComplaints' });
-    if (cmpData && cmpData.ok && cmpData.complaints) {
-      cmpData.complaints.forEach(function(c) {
-        const id = c.complaintId || c.id;
-        if (!id) return;
-        c.id = id;
-        if (!COMPLAINTS.find(x => x.id === id)) COMPLAINTS.push(c);
-      });
-    }
-
-    // 5. Expenses
-    const expData = await callSheets({ action: 'getExpenses' });
-    if (expData && expData.ok && expData.expenses) {
-      expData.expenses.forEach(function(e) {
-        const id = e.expenseId || e.id;
-        if (!id) return;
-        e.id = id;
-        if (!EXPENSES.find(x => x.id === id)) {
-          EXPENSES.push({ id, date:e.date||'', category:e.category||'', description:e.description||'', amount:parseFloat(e.amount||0), ref:e.refNo||'', fundingSource:e.fundingSource||'Regular', relatedJobId:e.relatedJobId||'', addedBy:e.addedBy||'', createdAt:e.createdAt||'' });
-        }
-      });
-    }
-
-    // 6. Schedule Slots
-    const today = new Date().toISOString().split('T')[0];
-    const slotData = await callSheets({ action: 'getAllSlots', from: today });
-    if (slotData && slotData.ok && slotData.slots) {
-      SCHEDULE_SLOTS = slotData.slots.map(cleanSlotData);
-    }
-
-    // 7. Waiting List
-    try {
-      const wlData = await callSheets({ action: 'getWaitlist' });
-      if (wlData && wlData.ok && wlData.waitlist) {
-        WAITLIST = wlData.waitlist.filter(w => w.status !== 'Converted' && w.status !== 'Removed');
-      }
-    } catch(wlErr) { console.log('Waitlist sync skipped:', wlErr); }
-
-    // 8. Household Budgets
-    try {
-      const hbData = await callSheets({ action: 'getHouseholdBudgets' });
-      if (hbData && hbData.ok && hbData.budgets && Object.keys(hbData.budgets).length) {
-        HOUSEHOLD_BUDGETS = hbData.budgets;
-        try { localStorage.setItem('djce_household_budgets', JSON.stringify(HOUSEHOLD_BUDGETS)); } catch(e){}
-      }
-    } catch(hbErr) { console.log('Household budgets sync skipped:', hbErr); }
-
-    // 9. Transportation Fees
-    try {
-      const tfData = await callSheets({ action: 'getTranspoFees' });
-      if (tfData && tfData.ok && tfData.fees && Object.keys(tfData.fees).length) {
-        TRANSPO_FEES = tfData.fees;
-        try { localStorage.setItem('djce_transpo_fees', JSON.stringify(TRANSPO_FEES)); } catch(e){}
-      }
-    } catch(e) { console.log('Transpo fees sync skipped:', e); }
-
-    // 11. Inventory
-    try {
-      const invData = await callSheets({ action: 'getInventory' });
-      if (invData && invData.ok && invData.items && invData.items.length) {
-        INVENTORY = invData.items.map(function(r){ return {id:r['Item ID'],name:r['Name'],category:r['Category'],qty:parseFloat(r['Qty'])||0,unit:r['Unit'],minStock:parseFloat(r['Min Stock'])||0,cost:parseFloat(r['Cost'])||0,notes:r['Notes']}; });
-      }
-    } catch(e) { console.log('Inventory sync skipped:', e); }
-
-    // 12. Feedback
-    try {
-      const fbData = await callSheets({ action: 'getFeedback' });
-      if (fbData && fbData.ok && fbData.items && fbData.items.length) {
-        FEEDBACK = fbData.items.map(function(r){ return {id:r['Feedback ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],rating:parseFloat(r['Rating'])||0,comment:r['Comment'],date:r['Date'],createdAt:r['Created At']}; });
-      }
-    } catch(e) { console.log('Feedback sync skipped:', e); }
-
-    // 13. Warranty Log
-    try {
-      const wlData2 = await callSheets({ action: 'getWarrantyLog' });
-      if (wlData2 && wlData2.ok && wlData2.items && wlData2.items.length) {
-        WARRANTY_LOG = wlData2.items.map(function(r){ return {id:r['Warranty ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],service:r['Service'],warrantyDays:parseInt(r['Warranty Days'])||0,startDate:r['Start Date'],endDate:r['End Date'],notes:r['Notes'],createdAt:r['Created At']}; });
-      }
-    } catch(e) { console.log('Warranty sync skipped:', e); }
-
-    // 14. Time Corrections
-    try {
-      const tcData = await callSheets({ action: 'getTimeCorrections' });
-      if (tcData && tcData.ok && tcData.items && tcData.items.length) {
-        TIME_CORRECTIONS = tcData.items.map(function(r){ return {id:r['Correction ID'],bookingId:r['Booking ID'],field:r['Field'],oldVal:r['Old Value'],newVal:r['New Value'],reason:r['Reason'],editedBy:r['Edited By'],timestamp:r['Timestamp']}; });
-      }
-    } catch(e) { console.log('Time corrections sync skipped:', e); }
-
-    // 15. Blacklist
-    try {
-      const blData = await callSheets({ action: 'getBlacklist' });
-      if (blData && blData.ok && blData.items && blData.items.length) {
-        BLACKLIST = blData.items.map(function(r){ return {id:r['Blacklist ID'],clientId:r['Client ID'],clientName:r['Client Name'],phone:r['Phone'],reason:r['Reason'],blacklistedBy:r['Blacklisted By'],blacklistedAt:r['Blacklisted At'],status:r['Status'],liftedBy:r['Lifted By'],liftedAt:r['Lifted At'],liftReason:r['Lift Reason'],notes:r['Notes']}; });
-      }
-    } catch(e) { console.log('Blacklist sync skipped:', e); }
-
-    // 16. Employees
-    try {
-      const empData = await callSheets({ action: 'getEmployees' });
-      if (empData && empData.ok && empData.employees && empData.employees.length) {
-        // Merge with existing localStorage data to preserve extra fields (sss, philhealth, etc.)
-        var existingMap = {};
-        ACCT_EMPLOYEES.forEach(function(e){ if(e.id) existingMap[e.id]=e; });
-        empData.employees.forEach(function(e){
-          if(existingMap[e.id]){
-            // Update core fields from Sheets, keep extra fields from localStorage
-            Object.assign(existingMap[e.id], {name:e.name||existingMap[e.id].name, role:e.role||existingMap[e.id].role, type:e.type||existingMap[e.id].type, dailyRate:e.dailyRate||existingMap[e.id].dailyRate, status:e.status||existingMap[e.id].status, phone:e.phone||existingMap[e.id].phone, startDate:e.startDate||existingMap[e.id].startDate});
-          } else {
-            // New employee from Sheets not in localStorage
-            ACCT_EMPLOYEES.push(e);
-          }
-        });
-        saveAcctData();
-      }
-    } catch(e) { console.log('Employees sync skipped:', e); }
-
-    // 17. Activity Log
-    try {
-      const alData = await callSheets({ action: 'getActivityLog' });
-      if (alData && alData.ok && alData.items && alData.items.length) {
-        ACTIVITY_LOG = alData.items.map(function(r){ return {icon:r['Action']||'📋',message:r['Details']||'',timestamp:r['Timestamp']||'',user:r['User']||'',type:r['Type']||'general'}; });
-      }
-    } catch(e) { console.log('Activity log sync skipped:', e); }
-
-    // 17. Communication Log
-    try {
-      const clData = await callSheets({ action: 'getCommLog' });
-      if (clData && clData.ok && clData.items && clData.items.length) {
-        COMM_LOG = clData.items.map(function(r){ return {id:r['Comm ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],type:r['Type'],direction:r['Direction'],summary:r['Summary'],date:r['Date'],by:r['By'],createdAt:r['Created At']}; });
-      }
-    } catch(e) { console.log('Comm log sync skipped:', e); }
-
-    // 18. Booking Photos
-    try {
-      const bpData = await callSheets({ action: 'getBookingPhotos' });
-      if (bpData && bpData.ok && bpData.photos && Object.keys(bpData.photos).length) {
-        BOOKING_PHOTOS = bpData.photos;
-      }
-    } catch(e) { console.log('Booking photos sync skipped:', e); }
-
-    // 19. Daily Tracker
-    try {
-      const dtData = await callSheets({ action: 'getDailyTracker' });
-      if (dtData && dtData.ok && dtData.records && dtData.records.length) {
-        ACCT_DAILY_LOG = dtData.records;
-        saveAcctData();
-      }
-    } catch(e) { console.log('Daily tracker sync skipped:', e); }
-
-    // 20. Payroll
-    try {
-      const prData = await callSheets({ action: 'getPayroll' });
-      if (prData && prData.ok && prData.records && prData.records.length) {
-        ACCT_PAYROLL = prData.records;
-        saveAcctData();
-      }
-    } catch(e) { console.log('Payroll sync skipped:', e); }
-
-    // 21. Investors
-    try {
-      const ivData = await callSheets({ action: 'getInvestors' });
-      if (ivData && ivData.ok && ivData.investors && ivData.investors.length) {
-        ACCT_INVESTORS = ivData.investors;
-        saveAcctData();
-      }
-    } catch(e) { console.log('Investors sync skipped:', e); }
-
-    // 22. Calendar Notes
-    try {
-      const cnData = await callSheets({ action: 'getCalendarNotes' });
-      if (cnData && cnData.ok && cnData.notes && Object.keys(cnData.notes).length) {
-        CALENDAR_NOTES = cnData.notes;
-        try { localStorage.setItem('djce_calendar_notes', JSON.stringify(CALENDAR_NOTES)); } catch(e){}
-      }
-    } catch(e) { console.log('Calendar notes sync skipped:', e); }
-
-    // 23. Commissions
-    try {
-      const comData = await callSheets({ action: 'getCommissions' });
-      if (comData && comData.ok && comData.records && comData.records.length) {
-        comData.records.forEach(function(r){
-          r.id = r.commissionId || r.id;
-          if (!ACCT_COMMISSIONS.find(function(x){return x.id===r.id;})) ACCT_COMMISSIONS.push(r);
-          else Object.assign(ACCT_COMMISSIONS.find(function(x){return x.id===r.id;}), r);
-        });
-      }
-    } catch(e) { console.log('Commissions sync skipped:', e); }
-
-    // 24. Petty Cash
-    try {
-      const pcData = await callSheets({ action: 'getPettyCash' });
-      if (pcData && pcData.ok && pcData.records && pcData.records.length) {
-        pcData.records.forEach(function(r){
-          r.id = r.entryId || r.id;
-          if (!ACCT_PETTY_CASH.find(function(x){return x.id===r.id;})) ACCT_PETTY_CASH.push(r);
-          else Object.assign(ACCT_PETTY_CASH.find(function(x){return x.id===r.id;}), r);
-        });
-      }
-    } catch(e) { console.log('Petty cash sync skipped:', e); }
-
-    // 25. Targets
-    try {
-      const tgtData = await callSheets({ action: 'getTargets' });
-      if (tgtData && tgtData.ok && tgtData.records && tgtData.records.length) {
-        tgtData.records.forEach(function(r){
-          var key = r.monthKey;
-          if (key) ACCT_TARGETS[key] = { target: parseFloat(r.target)||0, notes: r.notes||'' };
-        });
-      }
-    } catch(e) { console.log('Targets sync skipped:', e); }
-
-    // 26. 13th Month
-    try {
-      const tmData = await callSheets({ action: 'getThirteenthMonth' });
-      if (tmData && tmData.ok && tmData.records && tmData.records.length) {
-        tmData.records.forEach(function(r){
-          r.id = r.recordId || r.id;
-          try { if (typeof r.monthlyJson==='string') r.monthly = JSON.parse(r.monthlyJson); } catch(e){ r.monthly = []; }
-          if (!ACCT_13TH_MONTH.find(function(x){return x.id===r.id;})) ACCT_13TH_MONTH.push(r);
-          else Object.assign(ACCT_13TH_MONTH.find(function(x){return x.id===r.id;}), r);
-        });
-      }
-    } catch(e) { console.log('13th month sync skipped:', e); }
-
-    // 27. Unit Sales
-    try {
-      const usData = await callSheets({ action: 'getUnitSales' });
-      if (usData && usData.ok && usData.records && usData.records.length) {
-        usData.records.forEach(function(r){
-          r.id = r.saleId || r.id;
-          if (!UNIT_SALES.find(function(x){return x.id===r.id;})) UNIT_SALES.push(r);
-          else Object.assign(UNIT_SALES.find(function(x){return x.id===r.id;}), r);
-        });
-      }
-    } catch(e) { console.log('Unit sales sync skipped:', e); }
-
-    // 28. Investor Deposits
-    try {
-      const idepData = await callSheets({ action: 'getInvestorDeposits' });
-      if (idepData && idepData.ok && idepData.records && idepData.records.length) {
-        idepData.records.forEach(function(r){
-          r.id = r.depositId || r.id;
-          if (!INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;})) INVESTOR_DEPOSITS.push(r);
-          else Object.assign(INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;}), r);
-        });
-        saveAcctData();
-      }
-    } catch(e) { console.log('Investor deposits sync skipped:', e); }
-
-    // 29. Expansion Fund
-    try {
-      const efData = await callSheets({ action: 'getExpansionFund' });
-      if (efData && efData.ok && efData.records && efData.records.length) {
-        efData.records.forEach(function(r){
-          r.id = r.entryId || r.id;
-          if (!EXPANSION_FUND.find(function(x){return x.id===r.id;})) EXPANSION_FUND.push(r);
-          else Object.assign(EXPANSION_FUND.find(function(x){return x.id===r.id;}), r);
-        });
-        saveAcctData();
-      }
-    } catch(e) { console.log('Expansion fund sync skipped:', e); }
-
-    // 30. Investor Distributions
-    try {
-      const idistData = await callSheets({ action: 'getInvestorDistributions' });
-      if (idistData && idistData.ok && idistData.records && idistData.records.length) {
-        idistData.records.forEach(function(r){
-          r.id = r.distributionId || r.id;
-          if (!INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;})) INVESTOR_DISTRIBUTIONS.push(r);
-          else Object.assign(INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;}), r);
-        });
-        saveAcctData();
-      }
-    } catch(e) { console.log('Investor distributions sync skipped:', e); }
-
-    // 31. Portal Config (Commission Rates, Petty Cash Config, Profit Split)
-    try {
-      const cfgData = await callSheets({ action: 'getPortalConfig' });
-      if (cfgData && cfgData.ok && cfgData.config) {
-        if (cfgData.config.commissionRates) {
-          COMMISSION_RATES = cfgData.config.commissionRates;
-          try { localStorage.setItem('djce_commission_rates', JSON.stringify(COMMISSION_RATES)); } catch(e){}
-        }
-        if (cfgData.config.pettyCashConfig) {
-          PETTY_CASH_CONFIG = cfgData.config.pettyCashConfig;
-          try { localStorage.setItem('djce_petty_cash_config', JSON.stringify(PETTY_CASH_CONFIG)); } catch(e){}
-        }
-        if (cfgData.config.profitSplit) {
-          PROFIT_SPLIT = cfgData.config.profitSplit;
-          try { localStorage.setItem('djce_profit_split', JSON.stringify(PROFIT_SPLIT)); } catch(e){}
-        }
-      }
-    } catch(e) { console.log('Portal config sync skipped:', e); }
-
-    // 32. Daily Expenses
-    try {
-      const dexpData = await callSheets({ action: 'getDailyExpenses' });
-      if (dexpData && dexpData.ok && dexpData.expenses && Object.keys(dexpData.expenses).length) {
-        var existingDE = {};
-        try { existingDE = JSON.parse(localStorage.getItem('djce_daily_expenses')||'{}'); } catch(e){}
-        Object.keys(dexpData.expenses).forEach(function(date){
-          existingDE[date] = dexpData.expenses[date];
-        });
-        try { localStorage.setItem('djce_daily_expenses', JSON.stringify(existingDE)); } catch(e){}
-      }
-    } catch(e) { console.log('Daily expenses sync skipped:', e); }
-
-    // 33. Service Areas
-    try {
-      const saData = await callSheets({ action: 'getServiceAreas' });
-      if (saData && saData.ok && saData.areas && saData.areas.length) {
-        SERVICE_AREAS.length = 0;
-        saData.areas.forEach(function(a){ SERVICE_AREAS.push(a); });
-        SERVICE_AREAS.sort();
-        saveServiceAreas();
-      }
-    } catch(e) { console.log('Service areas sync skipped:', e); }
-
-    // 34. Area Schedule
-    try {
-      const asData = await callSheets({ action: 'getAreaSchedule' });
-      if (asData && asData.ok && asData.schedule && Object.keys(asData.schedule).length) {
-        Object.keys(asData.schedule).forEach(function(area){
-          AREA_SCHEDULE[area] = asData.schedule[area];
-        });
-        saveAreaSchedule();
-      }
-    } catch(e) { console.log('Area schedule sync skipped:', e); }
-
-    // 35. OPEX Categories
-    try {
-      const opexData = await callSheets({ action: 'getOpexCategories' });
-      if (opexData && opexData.ok && opexData.categories && opexData.categories.length) {
-        opexData.categories.forEach(function(c){
-          if (OPEX_CATEGORIES.indexOf(c)===-1) OPEX_CATEGORIES.push(c);
-        });
-        try { localStorage.setItem('djce_opex_categories', JSON.stringify(OPEX_CATEGORIES)); } catch(e){}
-      }
-    } catch(e) { console.log('OPEX categories sync skipped:', e); }
 
     saveLocalData();
     if (btn) btn.textContent = '⟳ Sync';
     updateNavBadges();
     const active = document.querySelector('.view.active');
     if (active) { const n = active.id.replace('view-',''); active.innerHTML = renderView(n); }
-    showToast('Synced with Google Sheets ✅', 'success');
+    var elapsed = ((Date.now()-syncStart)/1000).toFixed(1);
+    showToast('Synced with Google Sheets ✅ (' + elapsed + 's)', 'success');
 
   } catch(e) {
     console.error('Sync error:', e);
     if (btn) btn.textContent = '⟳ Sync';
     showToast('Sync failed — working offline 📴', 'warning');
   }
+}
+
+/* ── Bulk data processors ── */
+function _processBulkBookings(bkData) {
+  if (!bkData || !bkData.ok || !bkData.bookings) return;
+  bkData.bookings.forEach(function(b) {
+    var id = (b.bookingId || b.id || '').trim();
+    if (!id) return;
+    var normalized = {
+      id:id, refNo:(b.refNo||'').trim(), name:(b.name||'').trim(), phone:(b.phone||'').trim(),
+      email:(b.email||'').trim(), houseNo:(b.houseNo||'').trim(), street:(b.street||'').trim(),
+      barangay:(b.barangay||'').trim(), city:(b.city||'').trim(),
+      address:(b.fullAddress||b.address||'').trim(), landmark:(b.landmark||'').trim(),
+      lat:(b.lat||'').trim(), lng:(b.lng||'').trim(),
+      service:(b.service||b.services||'').trim(), serviceDetails:(b.serviceDetails||'').trim(),
+      date:(b.date||'').toString().substring(0,10).trim(), time:(b.timeSlot||b.time||'').trim(),
+      technician:(b.technician||b.assignedTo||b.assigned||'').trim(),
+      status:(b.status||'Pending').trim(), amount:(b.amount||'').trim(),
+      feeService:(b.feeService||'').trim(), feeParts:(b.feeParts||'').trim(),
+      feeTranspo:(b.feeTranspo||'').trim(), feeOther:(b.feeOther||'').trim(),
+      feeDiscount:(b.feeDiscount||'').trim(), usage:(b.usageFrequency||b.usage||'').trim(),
+      nextCleaningDate:(b.nextCleaningDate||'').trim(), notes:(b.notes||'').trim(),
+      source:(b.source||'website').trim(), followedUp:(b.followedUp||'').trim(),
+      completedAt:(b.completedAt||'').trim(), createdAt:(b.createdAt||'').trim(), _synced:true
+    };
+    // Fix date format from Sheets
+    if (normalized.date && !/^\d{4}-\d{2}-\d{2}/.test(normalized.date)) {
+      var dm = normalized.date.match(/^(\d{1,2})[\.\/](\d{1,2})$/);
+      if (dm) { var yr=new Date().getFullYear(); normalized.date=yr+'-'+String(dm[1]).padStart(2,'0')+'-'+String(dm[2]).padStart(2,'0'); }
+      var mdy = normalized.date.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{2,4})$/);
+      if (mdy) { var y=mdy[3].length===2?'20'+mdy[3]:mdy[3]; normalized.date=y+'-'+String(mdy[1]).padStart(2,'0')+'-'+String(mdy[2]).padStart(2,'0'); }
+    }
+    if (normalized.name && /\d{4}-\d{2}-\d{2}|^\d+\s+(st|nd|rd|th|street|ave|blvd)/i.test(normalized.name)) {
+      if (normalized.address && !/\d/.test(normalized.address.substring(0,3))) { var tmp=normalized.name; normalized.name=normalized.address; normalized.address=tmp; }
+    }
+    if (!BOOKINGS[id]) {
+      var isDupe = Object.values(BOOKINGS).some(function(existing) { return existing.name===normalized.name && existing.phone===normalized.phone && existing.date===normalized.date && existing.service===normalized.service && existing.id!==id; });
+      if (!isDupe) BOOKINGS[id] = normalized;
+    } else if (BOOKINGS[id]._dirty) {
+      BOOKINGS[id].name=normalized.name||BOOKINGS[id].name; BOOKINGS[id].phone=normalized.phone||BOOKINGS[id].phone;
+      BOOKINGS[id].email=normalized.email||BOOKINGS[id].email; BOOKINGS[id].address=normalized.address||BOOKINGS[id].address;
+      BOOKINGS[id].landmark=normalized.landmark||BOOKINGS[id].landmark; BOOKINGS[id].service=normalized.service||BOOKINGS[id].service;
+      BOOKINGS[id].serviceDetails=normalized.serviceDetails||BOOKINGS[id].serviceDetails;
+      BOOKINGS[id].date=normalized.date||BOOKINGS[id].date; BOOKINGS[id].time=normalized.time||BOOKINGS[id].time;
+      BOOKINGS[id].source=normalized.source||BOOKINGS[id].source; BOOKINGS[id].createdAt=normalized.createdAt||BOOKINGS[id].createdAt;
+      BOOKINGS[id]._synced=true;
+    } else { Object.assign(BOOKINGS[id], normalized); }
+  });
+}
+function _processBulkAccounts(res) { if (res) _applySheetAccounts(res); }
+function _processBulkClients(clData) {
+  if (!clData || !clData.ok || !clData.clients) return;
+  var sheetClientIds = new Set();
+  clData.clients.forEach(function(c) { var id=c.clientId||c.id; if(!id) return; c.id=id; sheetClientIds.add(id); if(!CLIENTS[id]){c._synced=true;CLIENTS[id]=c;}else{CLIENTS[id]._synced=true;} });
+  Object.keys(CLIENTS).forEach(function(k) { if(CLIENTS[k]&&CLIENTS[k]._synced&&!sheetClientIds.has(k)) delete CLIENTS[k]; });
+}
+function _processBulkComplaints(cmpData) {
+  if (!cmpData || !cmpData.ok || !cmpData.complaints) return;
+  cmpData.complaints.forEach(function(c) { var id=c.complaintId||c.id; if(!id) return; c.id=id; if(!COMPLAINTS.find(function(x){return x.id===id;})) COMPLAINTS.push(c); });
+}
+function _processBulkExpenses(expData) {
+  if (!expData || !expData.ok || !expData.expenses) return;
+  expData.expenses.forEach(function(e) { var id=e.expenseId||e.id; if(!id) return; e.id=id; if(!EXPENSES.find(function(x){return x.id===id;})) EXPENSES.push({id:id,date:e.date||'',category:e.category||'',description:e.description||'',amount:parseFloat(e.amount||0),ref:e.refNo||'',fundingSource:e.fundingSource||'Regular',relatedJobId:e.relatedJobId||'',addedBy:e.addedBy||'',createdAt:e.createdAt||''}); });
+}
+function _processBulkSlots(slotData) {
+  if (!slotData || !slotData.ok || !slotData.slots) return;
+  SCHEDULE_SLOTS = slotData.slots.map(cleanSlotData);
+}
+function _processBulkWaitlist(wlData) {
+  if (!wlData || !wlData.ok || !wlData.waitlist) return;
+  WAITLIST = wlData.waitlist.filter(function(w){return w.status!=='Converted'&&w.status!=='Removed';});
+}
+function _processBulkHouseholdBudgets(hbData) {
+  if (!hbData || !hbData.ok || !hbData.budgets || !Object.keys(hbData.budgets).length) return;
+  HOUSEHOLD_BUDGETS = hbData.budgets;
+  try { localStorage.setItem('djce_household_budgets', JSON.stringify(HOUSEHOLD_BUDGETS)); } catch(e){}
+}
+function _processBulkTranspoFees(tfData) {
+  if (!tfData || !tfData.ok || !tfData.fees || !Object.keys(tfData.fees).length) return;
+  TRANSPO_FEES = tfData.fees;
+  try { localStorage.setItem('djce_transpo_fees', JSON.stringify(TRANSPO_FEES)); } catch(e){}
+}
+function _processBulkInventory(invData) {
+  if (!invData || !invData.ok || !invData.items || !invData.items.length) return;
+  INVENTORY = invData.items.map(function(r){ return {id:r['Item ID'],name:r['Name'],category:r['Category'],qty:parseFloat(r['Qty'])||0,unit:r['Unit'],minStock:parseFloat(r['Min Stock'])||0,cost:parseFloat(r['Cost'])||0,notes:r['Notes']}; });
+}
+function _processBulkFeedback(fbData) {
+  if (!fbData || !fbData.ok || !fbData.items || !fbData.items.length) return;
+  FEEDBACK = fbData.items.map(function(r){ return {id:r['Feedback ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],rating:parseFloat(r['Rating'])||0,comment:r['Comment'],date:r['Date'],createdAt:r['Created At']}; });
+}
+function _processBulkWarrantyLog(wlData) {
+  if (!wlData || !wlData.ok || !wlData.items || !wlData.items.length) return;
+  WARRANTY_LOG = wlData.items.map(function(r){ return {id:r['Warranty ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],service:r['Service'],warrantyDays:parseInt(r['Warranty Days'])||0,startDate:r['Start Date'],endDate:r['End Date'],notes:r['Notes'],createdAt:r['Created At']}; });
+}
+function _processBulkTimeCorrections(tcData) {
+  if (!tcData || !tcData.ok || !tcData.items || !tcData.items.length) return;
+  TIME_CORRECTIONS = tcData.items.map(function(r){ return {id:r['Correction ID'],bookingId:r['Booking ID'],field:r['Field'],oldVal:r['Old Value'],newVal:r['New Value'],reason:r['Reason'],editedBy:r['Edited By'],timestamp:r['Timestamp']}; });
+}
+function _processBulkBlacklist(blData) {
+  if (!blData || !blData.ok || !blData.items || !blData.items.length) return;
+  BLACKLIST = blData.items.map(function(r){ return {id:r['Blacklist ID'],clientId:r['Client ID'],clientName:r['Client Name'],phone:r['Phone'],reason:r['Reason'],blacklistedBy:r['Blacklisted By'],blacklistedAt:r['Blacklisted At'],status:r['Status'],liftedBy:r['Lifted By'],liftedAt:r['Lifted At'],liftReason:r['Lift Reason'],notes:r['Notes']}; });
+}
+function _processBulkEmployees(empData) {
+  if (!empData || !empData.ok || !empData.employees || !empData.employees.length) return;
+  var existingMap = {}; ACCT_EMPLOYEES.forEach(function(e){ if(e.id) existingMap[e.id]=e; });
+  empData.employees.forEach(function(e){ if(existingMap[e.id]){ Object.assign(existingMap[e.id],{name:e.name||existingMap[e.id].name,role:e.role||existingMap[e.id].role,type:e.type||existingMap[e.id].type,dailyRate:e.dailyRate||existingMap[e.id].dailyRate,status:e.status||existingMap[e.id].status,phone:e.phone||existingMap[e.id].phone,startDate:e.startDate||existingMap[e.id].startDate}); } else { ACCT_EMPLOYEES.push(e); } });
+  saveAcctData();
+}
+function _processBulkActivityLog(alData) {
+  if (!alData || !alData.ok || !alData.items || !alData.items.length) return;
+  ACTIVITY_LOG = alData.items.map(function(r){ return {icon:r['Action']||'📋',message:r['Details']||'',timestamp:r['Timestamp']||'',user:r['User']||'',type:r['Type']||'general'}; });
+}
+function _processBulkCommLog(clData) {
+  if (!clData || !clData.ok || !clData.items || !clData.items.length) return;
+  COMM_LOG = clData.items.map(function(r){ return {id:r['Comm ID'],bookingId:r['Booking ID'],clientName:r['Client Name'],type:r['Type'],direction:r['Direction'],summary:r['Summary'],date:r['Date'],by:r['By'],createdAt:r['Created At']}; });
+}
+function _processBulkBookingPhotos(bpData) {
+  if (!bpData || !bpData.ok || !bpData.photos || !Object.keys(bpData.photos).length) return;
+  BOOKING_PHOTOS = bpData.photos;
+}
+function _processBulkDailyTracker(dtData) {
+  if (!dtData || !dtData.ok || !dtData.records || !dtData.records.length) return;
+  ACCT_DAILY_LOG = dtData.records; saveAcctData();
+}
+function _processBulkPayroll(prData) {
+  if (!prData || !prData.ok || !prData.records || !prData.records.length) return;
+  ACCT_PAYROLL = prData.records; saveAcctData();
+}
+function _processBulkInvestors(ivData) {
+  if (!ivData || !ivData.ok || !ivData.investors || !ivData.investors.length) return;
+  ACCT_INVESTORS = ivData.investors; saveAcctData();
+}
+function _processBulkCalendarNotes(cnData) {
+  if (!cnData || !cnData.ok || !cnData.notes || !Object.keys(cnData.notes).length) return;
+  CALENDAR_NOTES = cnData.notes;
+  try { localStorage.setItem('djce_calendar_notes', JSON.stringify(CALENDAR_NOTES)); } catch(e){}
+}
+function _processBulkCommissions(comData) {
+  if (!comData || !comData.ok || !comData.records || !comData.records.length) return;
+  comData.records.forEach(function(r){ r.id=r.commissionId||r.id; if(!ACCT_COMMISSIONS.find(function(x){return x.id===r.id;})) ACCT_COMMISSIONS.push(r); else Object.assign(ACCT_COMMISSIONS.find(function(x){return x.id===r.id;}),r); });
+}
+function _processBulkPettyCash(pcData) {
+  if (!pcData || !pcData.ok || !pcData.records || !pcData.records.length) return;
+  pcData.records.forEach(function(r){ r.id=r.entryId||r.id; if(!ACCT_PETTY_CASH.find(function(x){return x.id===r.id;})) ACCT_PETTY_CASH.push(r); else Object.assign(ACCT_PETTY_CASH.find(function(x){return x.id===r.id;}),r); });
+}
+function _processBulkTargets(tgtData) {
+  if (!tgtData || !tgtData.ok || !tgtData.records || !tgtData.records.length) return;
+  tgtData.records.forEach(function(r){ var key=r.monthKey; if(key) ACCT_TARGETS[key]={target:parseFloat(r.target)||0,notes:r.notes||''}; });
+}
+function _processBulk13thMonth(tmData) {
+  if (!tmData || !tmData.ok || !tmData.records || !tmData.records.length) return;
+  tmData.records.forEach(function(r){ r.id=r.recordId||r.id; try{if(typeof r.monthlyJson==='string')r.monthly=JSON.parse(r.monthlyJson);}catch(e){r.monthly=[];} if(!ACCT_13TH_MONTH.find(function(x){return x.id===r.id;})) ACCT_13TH_MONTH.push(r); else Object.assign(ACCT_13TH_MONTH.find(function(x){return x.id===r.id;}),r); });
+}
+function _processBulkUnitSales(usData) {
+  if (!usData || !usData.ok || !usData.records || !usData.records.length) return;
+  usData.records.forEach(function(r){ r.id=r.saleId||r.id; if(!UNIT_SALES.find(function(x){return x.id===r.id;})) UNIT_SALES.push(r); else Object.assign(UNIT_SALES.find(function(x){return x.id===r.id;}),r); });
+}
+function _processBulkInvestorDeposits(idepData) {
+  if (!idepData || !idepData.ok || !idepData.records || !idepData.records.length) return;
+  idepData.records.forEach(function(r){ r.id=r.depositId||r.id; if(!INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;})) INVESTOR_DEPOSITS.push(r); else Object.assign(INVESTOR_DEPOSITS.find(function(x){return x.id===r.id;}),r); });
+  saveAcctData();
+}
+function _processBulkExpansionFund(efData) {
+  if (!efData || !efData.ok || !efData.records || !efData.records.length) return;
+  efData.records.forEach(function(r){ r.id=r.entryId||r.id; if(!EXPANSION_FUND.find(function(x){return x.id===r.id;})) EXPANSION_FUND.push(r); else Object.assign(EXPANSION_FUND.find(function(x){return x.id===r.id;}),r); });
+  saveAcctData();
+}
+function _processBulkInvestorDistributions(idistData) {
+  if (!idistData || !idistData.ok || !idistData.records || !idistData.records.length) return;
+  idistData.records.forEach(function(r){ r.id=r.distributionId||r.id; if(!INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;})) INVESTOR_DISTRIBUTIONS.push(r); else Object.assign(INVESTOR_DISTRIBUTIONS.find(function(x){return x.id===r.id;}),r); });
+  saveAcctData();
+}
+function _processBulkPortalConfig(cfgData) {
+  if (!cfgData || !cfgData.ok || !cfgData.config) return;
+  if(cfgData.config.commissionRates){COMMISSION_RATES=cfgData.config.commissionRates;try{localStorage.setItem('djce_commission_rates',JSON.stringify(COMMISSION_RATES));}catch(e){}}
+  if(cfgData.config.pettyCashConfig){PETTY_CASH_CONFIG=cfgData.config.pettyCashConfig;try{localStorage.setItem('djce_petty_cash_config',JSON.stringify(PETTY_CASH_CONFIG));}catch(e){}}
+  if(cfgData.config.profitSplit){PROFIT_SPLIT=cfgData.config.profitSplit;try{localStorage.setItem('djce_profit_split',JSON.stringify(PROFIT_SPLIT));}catch(e){}}
+}
+function _processBulkDailyExpenses(dexpData) {
+  if (!dexpData || !dexpData.ok || !dexpData.expenses || !Object.keys(dexpData.expenses).length) return;
+  var existingDE={}; try{existingDE=JSON.parse(localStorage.getItem('djce_daily_expenses')||'{}');}catch(e){}
+  Object.keys(dexpData.expenses).forEach(function(date){existingDE[date]=dexpData.expenses[date];});
+  try{localStorage.setItem('djce_daily_expenses',JSON.stringify(existingDE));}catch(e){}
+}
+function _processBulkServiceAreas(saData) {
+  if (!saData || !saData.ok || !saData.areas || !saData.areas.length) return;
+  SERVICE_AREAS.length=0; saData.areas.forEach(function(a){SERVICE_AREAS.push(a);}); SERVICE_AREAS.sort(); saveServiceAreas();
+}
+function _processBulkAreaSchedule(asData) {
+  if (!asData || !asData.ok || !asData.schedule || !Object.keys(asData.schedule).length) return;
+  Object.keys(asData.schedule).forEach(function(area){AREA_SCHEDULE[area]=asData.schedule[area];}); saveAreaSchedule();
+}
+function _processBulkOpexCategories(opexData) {
+  if (!opexData || !opexData.ok || !opexData.categories || !opexData.categories.length) return;
+  opexData.categories.forEach(function(c){if(OPEX_CATEGORIES.indexOf(c)===-1)OPEX_CATEGORIES.push(c);});
+  try{localStorage.setItem('djce_opex_categories',JSON.stringify(OPEX_CATEGORIES));}catch(e){}
+}
+
+/* ── Fallback: sequential fetch (if bulkFetch not deployed yet) ── */
+async function _fetchFromSheetsFallback() {
+  var bkData = await callSheets({ action: 'getBookings' });
+  _processBulkBookings(bkData);
+  if (session) await loadAccountsFromSheets();
+  _processBulkClients(await callSheets({ action: 'getClients' }));
+  _processBulkComplaints(await callSheets({ action: 'getComplaints' }));
+  _processBulkExpenses(await callSheets({ action: 'getExpenses' }));
+  var today = new Date().toISOString().split('T')[0];
+  _processBulkSlots(await callSheets({ action: 'getAllSlots', from: today }));
+  try { _processBulkWaitlist(await callSheets({ action: 'getWaitlist' })); } catch(e){}
+  try { _processBulkHouseholdBudgets(await callSheets({ action: 'getHouseholdBudgets' })); } catch(e){}
+  try { _processBulkTranspoFees(await callSheets({ action: 'getTranspoFees' })); } catch(e){}
+  try { _processBulkInventory(await callSheets({ action: 'getInventory' })); } catch(e){}
+  try { _processBulkFeedback(await callSheets({ action: 'getFeedback' })); } catch(e){}
+  try { _processBulkWarrantyLog(await callSheets({ action: 'getWarrantyLog' })); } catch(e){}
+  try { _processBulkTimeCorrections(await callSheets({ action: 'getTimeCorrections' })); } catch(e){}
+  try { _processBulkBlacklist(await callSheets({ action: 'getBlacklist' })); } catch(e){}
+  try { _processBulkEmployees(await callSheets({ action: 'getEmployees' })); } catch(e){}
+  try { _processBulkActivityLog(await callSheets({ action: 'getActivityLog' })); } catch(e){}
+  try { _processBulkCommLog(await callSheets({ action: 'getCommLog' })); } catch(e){}
+  try { _processBulkBookingPhotos(await callSheets({ action: 'getBookingPhotos' })); } catch(e){}
+  try { _processBulkDailyTracker(await callSheets({ action: 'getDailyTracker' })); } catch(e){}
+  try { _processBulkPayroll(await callSheets({ action: 'getPayroll' })); } catch(e){}
+  try { _processBulkInvestors(await callSheets({ action: 'getInvestors' })); } catch(e){}
+  try { _processBulkCalendarNotes(await callSheets({ action: 'getCalendarNotes' })); } catch(e){}
+  try { _processBulkCommissions(await callSheets({ action: 'getCommissions' })); } catch(e){}
+  try { _processBulkPettyCash(await callSheets({ action: 'getPettyCash' })); } catch(e){}
+  try { _processBulkTargets(await callSheets({ action: 'getTargets' })); } catch(e){}
+  try { _processBulk13thMonth(await callSheets({ action: 'getThirteenthMonth' })); } catch(e){}
+  try { _processBulkUnitSales(await callSheets({ action: 'getUnitSales' })); } catch(e){}
+  try { _processBulkInvestorDeposits(await callSheets({ action: 'getInvestorDeposits' })); } catch(e){}
+  try { _processBulkExpansionFund(await callSheets({ action: 'getExpansionFund' })); } catch(e){}
+  try { _processBulkInvestorDistributions(await callSheets({ action: 'getInvestorDistributions' })); } catch(e){}
+  try { _processBulkPortalConfig(await callSheets({ action: 'getPortalConfig' })); } catch(e){}
+  try { _processBulkDailyExpenses(await callSheets({ action: 'getDailyExpenses' })); } catch(e){}
+  try { _processBulkServiceAreas(await callSheets({ action: 'getServiceAreas' })); } catch(e){}
+  try { _processBulkAreaSchedule(await callSheets({ action: 'getAreaSchedule' })); } catch(e){}
+  try { _processBulkOpexCategories(await callSheets({ action: 'getOpexCategories' })); } catch(e){}
 }
 
 async function manualSync() { await fetchFromSheets(); }
