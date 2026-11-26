@@ -12503,28 +12503,70 @@ function renderFollowup(){
   const fu=getFollowUpDue();
   const overdue=due.filter(c=>new Date(c.nextCleaningDate)<new Date());
   const soon=due.filter(c=>new Date(c.nextCleaningDate)>=new Date());
+  // Tracked clients with follow-up statuses
+  const allCl=mergeClients();
+  const tracked=allCl.filter(c=>c.followUpStatus);
+  const tContacted=tracked.filter(c=>c.followUpStatus==='contacted');
+  const tFollowup=tracked.filter(c=>c.followUpStatus==='followup');
+  const tNoResponse=tracked.filter(c=>c.followUpStatus==='noresponse');
+  const tDeclined=tracked.filter(c=>c.followUpStatus==='declined');
+  const tRepairOnly=tracked.filter(c=>c.followUpStatus==='repaironly');
+  var fuStatusLabels={'contacted':'📲 Contacted','followup':'🔁 Follow-up','noresponse':'❌ No Response','declined':'⏸️ Declined','repaironly':'🔧 Repair Only'};
+  var fuStatusColors={'contacted':'var(--info)','followup':'var(--warning)','noresponse':'var(--text-dim)','declined':'var(--text-dim)','repaironly':'var(--success)'};
   return '<div class="stats-grid">'+
     '<div class="stat-card stat-danger"><div class="stat-icon">🔴</div><div class="stat-label">Cleaning Overdue</div><div class="stat-value" style="color:var(--danger)">'+overdue.length+'</div></div>'+
     '<div class="stat-card stat-warning"><div class="stat-icon">⚠️</div><div class="stat-label">Due in ≤14 Days</div><div class="stat-value" style="color:var(--warning)">'+soon.length+'</div></div>'+
+    '<div class="stat-card" style="border-left:3px solid var(--info)"><div class="stat-icon">📋</div><div class="stat-label">With Follow-Up Status</div><div class="stat-value" style="color:var(--info)">'+tracked.length+'</div></div>'+
     '<div class="stat-card stat-info"><div class="stat-icon">📱</div><div class="stat-label">After-Sales Follow-up</div><div class="stat-value">'+fu.length+'</div></div>'+
   '</div>'+
-  '<div class="tabs"><div class="tab active" onclick="showFUTab(this,\'fu-c\')">🧹 Due for Cleaning ('+due.length+')</div><div class="tab" onclick="showFUTab(this,\'fu-f\')">📱 After-Sales ('+fu.length+')</div></div>'+
+  '<div class="tabs"><div class="tab active" onclick="showFUTab(this,\'fu-c\')">🧹 Due for Cleaning ('+due.length+')</div><div class="tab" onclick="showFUTab(this,\'fu-t\')">📋 Tracked ('+tracked.length+')</div><div class="tab" onclick="showFUTab(this,\'fu-f\')">📱 After-Sales ('+fu.length+')</div></div>'+
   '<div id="fu-c">'+
     (due.length ? due.map(function(c){
       const over=new Date(c.nextCleaningDate)<new Date();
+      var eId=escH(c.id||'').replace(/'/g,'&#39;');
       return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '+(over?'var(--danger)':'var(--warning)')+';border-radius:8px;padding:13px;margin-bottom:8px">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'+
         '<div><strong style="font-size:14px">'+escH(c.name)+'</strong>'+
+        (c.followUpStatus?'<span class="status-badge s-pending" style="margin-left:6px;font-size:10px">'+escH(fuStatusLabels[c.followUpStatus]||c.followUpStatus)+'</span>':'')+
         '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">📞 '+escH(c.phone||'—')+' · 📍 '+escH(c.address||'—')+'</div>'+
         '<div style="font-size:11px;color:var(--text-dim)">Last: <strong>'+escH(c.lastService||'—')+'</strong> on '+formatDate(c.lastServiceDate)+'</div>'+
         '<div style="font-size:11px;color:var(--text-dim)">Frequency: '+(c.usage||'Not set')+'</div></div>'+
         '<div style="text-align:right">'+
         '<span class="status-badge '+(over?'s-cancelled':'s-pending')+'">'+(over?'OVERDUE':'DUE '+formatDate(c.nextCleaningDate))+'</span>'+
-        '<div style="margin-top:7px;display:flex;gap:5px;justify-content:flex-end">'+
+        '<div style="margin-top:7px;display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">'+
         (c.phone?'<a href="tel:'+c.phone+'" class="btn btn-success btn-xs">📞 Call</a>':'')+
-        '<button class="btn btn-gold btn-xs" onclick="openNewBooking(\''+c.name+'\',\''+c.phone+'\',\''+c.address+'\')">📋 Book Now</button>'+
+        '<button class="btn btn-outline btn-xs" style="font-size:10px" onclick="openFollowUpMenu(\''+eId+'\')">📋 Status</button>'+
+        '<button class="btn btn-gold btn-xs" onclick="openNewBooking(\''+escH(c.name)+'\',\''+escH(c.phone||'')+'\',\''+escH(c.address||'').replace(/'/g,'&#39;')+'\')">📋 Book Now</button>'+
         '</div></div></div></div>';
     }).join('') : '<div class="empty"><div class="empty-ic">✅</div>No clients due for cleaning</div>')+
+  '</div>'+
+  '<div id="fu-t" style="display:none">'+
+    (tracked.length ? (function(){
+      var sections=[
+        {key:'contacted',items:tContacted},{key:'followup',items:tFollowup},
+        {key:'noresponse',items:tNoResponse},{key:'declined',items:tDeclined},{key:'repaironly',items:tRepairOnly}
+      ];
+      return sections.filter(function(s){return s.items.length;}).map(function(s){
+        return '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">'+fuStatusLabels[s.key]+' ('+s.items.length+')</div>'+
+        s.items.map(function(c){
+          var eId=escH(c.id||'').replace(/'/g,'&#39;');
+          return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '+fuStatusColors[s.key]+';border-radius:8px;padding:13px;margin-bottom:6px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'+
+          '<div><strong style="font-size:14px">'+escH(c.name)+'</strong>'+
+          '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">📞 '+escH(c.phone||'—')+' · 📍 '+escH(c.address||'—')+'</div>'+
+          '<div style="font-size:11px;color:var(--text-dim)">Last: <strong>'+escH(c.lastService||'—')+'</strong>'+(c.lastServiceDate?' on '+formatDate(c.lastServiceDate):'')+'</div>'+
+          (c.nextCleaningDate?'<div style="font-size:11px;color:var(--text-dim)">Next cleaning: '+formatDate(c.nextCleaningDate)+'</div>':'')+
+          '</div>'+
+          '<div style="text-align:right">'+
+          '<span class="status-badge s-confirmed" style="font-size:11px">'+escH(fuStatusLabels[s.key])+'</span>'+
+          '<div style="margin-top:7px;display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">'+
+          (c.phone?'<a href="tel:'+c.phone+'" class="btn btn-success btn-xs">📞 Call</a>':'')+
+          '<button class="btn btn-outline btn-xs" style="font-size:10px" onclick="openFollowUpMenu(\''+eId+'\')">📋 Change</button>'+
+          '<button class="btn btn-gold btn-xs" onclick="openNewBooking(\''+escH(c.name)+'\',\''+escH(c.phone||'')+'\',\''+escH(c.address||'').replace(/'/g,'&#39;')+'\')">📋 Book</button>'+
+          '</div></div></div></div>';
+        }).join('');
+      }).join('');
+    })() : '<div class="empty"><div class="empty-ic">📋</div>No clients with follow-up status<br><span style="font-size:12px;color:var(--text-dim)">Set a status from the Due for Cleaning tab or Client Records</span></div>')+
   '</div>'+
   '<div id="fu-f" style="display:none">'+
     (fu.length ?
@@ -12546,7 +12588,7 @@ function renderFollowup(){
 
 function showFUTab(el,show){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
-  ['fu-c','fu-f'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=id===show?'':'none';});
+  ['fu-c','fu-t','fu-f'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=id===show?'':'none';});
 }
 
 /* ===== RICH NOTES EDITOR ===== */
