@@ -8016,6 +8016,8 @@ function addBudgetCategory(type){
   var isHouse = type==='household';
   var label = isHouse ? 'Household' : 'Shop / Operations';
   document.getElementById('expModalTitle').textContent = '➕ Add '+label+' Category';
+  var subEl = document.querySelector('#expenseModal .modal-sub');
+  if(subEl) subEl.textContent = 'New category for '+label;
   document.getElementById('expModalBody').innerHTML = '<div class="form-grid">'
     +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Shop Rent, Wifi, Groceries"></div>'
     +'<div class="field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
