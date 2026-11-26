@@ -527,6 +527,7 @@ function doGet(e) {
         case 'saveAreaSchedule':    result = saveAreaScheduleAction(params); break;
         case 'getOpexCategories':   result = getOpexCategories();         break;
         case 'saveOpexCategories':  result = saveOpexCategoriesAction(params); break;
+        case 'bulkFetch':           result = bulkFetch(params);           break;
         default: result = { ok: false, error: 'Unknown action: ' + action };
       }
     }
@@ -3252,5 +3253,230 @@ function saveOpexCategoriesAction(p) {
     sheet.getRange(2, 1, rows.length, 2).setValues(rows);
   }
   return { ok: true, count: categories.length };
+}
+
+/**
+ * Bulk fetch — returns all read-only data in a single request.
+ * Opens the spreadsheet ONCE and reads all sheets from it.
+ */
+function bulkFetch(p) {
+  var today = new Date().toISOString().split('T')[0];
+  var data = {};
+
+  // Open spreadsheet ONCE — this is the expensive call
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+
+  // Helper: get sheet data safely (returns empty array if sheet missing)
+  function rd(name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) return [];
+    return sh.getDataRange().getValues();
+  }
+
+  // Helper: convert rows to objects using headerToKey
+  function rowsToObjs(rows) {
+    if (rows.length < 2) return [];
+    var hdrs = rows[0];
+    var out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var obj = {};
+      for (var j = 0; j < hdrs.length; j++) obj[headerToKey(hdrs[j])] = cellToString(rows[i][j]);
+      out.push(obj);
+    }
+    return out;
+  }
+
+  // Helper: convert rows using HEADERS constant (for array sheets)
+  function rowsWithHdrs(rows, sheetName) {
+    var hdrs = HEADERS[sheetName];
+    if (!hdrs || rows.length < 2) return [];
+    var out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var obj = {};
+      for (var j = 0; j < hdrs.length; j++) obj[hdrs[j]] = rows[i][j] !== undefined ? rows[i][j] : '';
+      out.push(obj);
+    }
+    return out;
+  }
+
+  // 1. Bookings
+  try {
+    var bkRows = rd('Bookings');
+    var bookings = rowsToObjs(bkRows);
+    if (p && p.status) bookings = bookings.filter(function(b){return b.status===p.status;});
+    data.bookings = {ok:true, bookings:bookings};
+  } catch(e) { data.bookings = {ok:false,error:e.message}; }
+
+  // 2. Accounts (safe — strip passwords)
+  try {
+    var acRows = rd('Accounts');
+    var accounts = [];
+    if (acRows.length > 1) {
+      var acHdrs = acRows[0];
+      for (var ai = 1; ai < acRows.length; ai++) {
+        var aObj = {};
+        for (var aj = 0; aj < acHdrs.length; aj++) {
+          var aKey = headerToKey(acHdrs[aj]);
+          if (aKey === 'password') continue;
+          aObj[aKey] = cellToString(acRows[ai][aj]);
+        }
+        accounts.push(aObj);
+      }
+    }
+    data.accounts = {ok:true, accounts:accounts};
+  } catch(e) { data.accounts = {ok:false,error:e.message}; }
+
+  // 3. Clients
+  try { data.clients = {ok:true, clients: rowsToObjs(rd('Clients'))}; } catch(e) { data.clients = {ok:false,error:e.message}; }
+
+  // 4. Complaints
+  try { data.complaints = {ok:true, complaints: rowsToObjs(rd('Complaints'))}; } catch(e) { data.complaints = {ok:false,error:e.message}; }
+
+  // 5. Expenses
+  try { data.expenses = {ok:true, expenses: rowsToObjs(rd('Expenses'))}; } catch(e) { data.expenses = {ok:false,error:e.message}; }
+
+  // 6. Schedule Slots
+  try {
+    var slRows = rd('ScheduleSlots');
+    var slots = rowsToObjs(slRows);
+    slots = slots.filter(function(s){ return !today || s.date >= today; });
+    slots.forEach(function(s){
+      var si = TIME_SLOTS[s.timeSlot] || {label:s.timeSlot,time:s.timeSlot};
+      s.label = si.label; s.time = si.time;
+      s.remaining = Math.max(0,(parseInt(s.maxBookings)||0)-(parseInt(s.currentBookings)||0));
+    });
+    slots.sort(function(a,b){
+      if(a.date!==b.date)return a.date.localeCompare(b.date);
+      var o={morning:0,afternoon:1,evening:2};return(o[a.timeSlot]||0)-(o[b.timeSlot]||0);
+    });
+    data.slots = {ok:true, slots:slots};
+  } catch(e) { data.slots = {ok:false,error:e.message}; }
+
+  // 7. Waitlist
+  try { data.waitlist = {ok:true, waitlist: rowsToObjs(rd('Waitlist'))}; } catch(e) { data.waitlist = {ok:false,error:e.message}; }
+
+  // 8. Household Budgets (key-value)
+  try {
+    var hbRows = rd('HouseholdBudgets');
+    var budgets = {};
+    for (var hi = 1; hi < hbRows.length; hi++) { var cat=String(hbRows[hi][0]).trim(); if(cat) budgets[cat]=parseFloat(hbRows[hi][1])||0; }
+    data.householdBudgets = {ok:true, budgets:budgets};
+  } catch(e) { data.householdBudgets = {ok:false,error:e.message}; }
+
+  // 9. Transpo Fees (key-value)
+  try {
+    var tfRows = rd('TranspoFees');
+    var fees = {};
+    for (var ti = 1; ti < tfRows.length; ti++) { var area=String(tfRows[ti][0]).trim(); if(area) fees[area]={fee:parseFloat(tfRows[ti][1])||0,label:tfRows[ti][2]||''}; }
+    data.transpoFees = {ok:true, fees:fees};
+  } catch(e) { data.transpoFees = {ok:false,error:e.message}; }
+
+  // 10-14. Array-based sheets (use HEADERS)
+  try { data.inventory = {ok:true, items: rowsWithHdrs(rd('InventoryItems'),'InventoryItems')}; } catch(e) { data.inventory = {ok:false,error:e.message}; }
+  try { data.feedback = {ok:true, items: rowsWithHdrs(rd('FeedbackLog'),'FeedbackLog')}; } catch(e) { data.feedback = {ok:false,error:e.message}; }
+  try { data.warrantyLog = {ok:true, items: rowsWithHdrs(rd('WarrantyLog'),'WarrantyLog')}; } catch(e) { data.warrantyLog = {ok:false,error:e.message}; }
+  try { data.timeCorrections = {ok:true, items: rowsWithHdrs(rd('TimeCorrections'),'TimeCorrections')}; } catch(e) { data.timeCorrections = {ok:false,error:e.message}; }
+  try { data.blacklist = {ok:true, items: rowsWithHdrs(rd('BlacklistLog'),'BlacklistLog')}; } catch(e) { data.blacklist = {ok:false,error:e.message}; }
+
+  // 15. Employees
+  try {
+    var empRows = rd('Employees');
+    data.employees = {ok:true, employees: rowsToObjs(empRows)};
+  } catch(e) { data.employees = {ok:false,error:e.message}; }
+
+  // 16-17. Activity Log & Comm Log (array sheets)
+  try { data.activityLog = {ok:true, items: rowsWithHdrs(rd('ActivityLogSheet'),'ActivityLogSheet')}; } catch(e) { data.activityLog = {ok:false,error:e.message}; }
+  try { data.commLog = {ok:true, items: rowsWithHdrs(rd('CommLog'),'CommLog')}; } catch(e) { data.commLog = {ok:false,error:e.message}; }
+
+  // 18. Booking Photos (key-JSON)
+  try {
+    var bpRows = rd('BookingPhotos');
+    var photos = {};
+    for (var bi = 1; bi < bpRows.length; bi++) { var bid=String(bpRows[bi][0]).trim(); if(bid) try{photos[bid]=JSON.parse(bpRows[bi][1]||'[]');}catch(e2){photos[bid]=[];} }
+    data.bookingPhotos = {ok:true, photos:photos};
+  } catch(e) { data.bookingPhotos = {ok:false,error:e.message}; }
+
+  // 19. Daily Tracker
+  try { data.dailyTracker = {ok:true, records: rowsToObjs(rd('DailyTracker'))}; } catch(e) { data.dailyTracker = {ok:false,error:e.message}; }
+
+  // 20. Payroll
+  try { data.payroll = {ok:true, records: rowsToObjs(rd('Payroll'))}; } catch(e) { data.payroll = {ok:false,error:e.message}; }
+
+  // 21. Investors
+  try { data.investors = {ok:true, investors: rowsToObjs(rd('InvestorShares'))}; } catch(e) { data.investors = {ok:false,error:e.message}; }
+
+  // 22. Calendar Notes (key-object)
+  try {
+    var cnRows = rd('CalendarNotes');
+    var notes = {};
+    for (var ci = 1; ci < cnRows.length; ci++) { var dt=String(cnRows[ci][0]).trim(); if(dt) notes[dt]={note:String(cnRows[ci][1]||''),category:String(cnRows[ci][2]||''),createdBy:String(cnRows[ci][3]||''),createdAt:String(cnRows[ci][4]||''),updatedAt:String(cnRows[ci][5]||'')}; }
+    data.calendarNotes = {ok:true, notes:notes};
+  } catch(e) { data.calendarNotes = {ok:false,error:e.message}; }
+
+  // 23. Commissions
+  try { data.commissions = {ok:true, records: rowsToObjs(rd('Commissions'))}; } catch(e) { data.commissions = {ok:false,error:e.message}; }
+
+  // 24. Petty Cash
+  try { data.pettyCash = {ok:true, records: rowsToObjs(rd('PettyCash'))}; } catch(e) { data.pettyCash = {ok:false,error:e.message}; }
+
+  // 25. Targets
+  try { data.targets = {ok:true, records: rowsToObjs(rd('Targets'))}; } catch(e) { data.targets = {ok:false,error:e.message}; }
+
+  // 26. 13th Month
+  try { data.thirteenthMonth = {ok:true, records: rowsToObjs(rd('ThirteenthMonth'))}; } catch(e) { data.thirteenthMonth = {ok:false,error:e.message}; }
+
+  // 27. Unit Sales
+  try { data.unitSales = {ok:true, records: rowsToObjs(rd('UnitSales'))}; } catch(e) { data.unitSales = {ok:false,error:e.message}; }
+
+  // 28. Investor Deposits
+  try { data.investorDeposits = {ok:true, records: rowsToObjs(rd('InvestorDeposits'))}; } catch(e) { data.investorDeposits = {ok:false,error:e.message}; }
+
+  // 29. Expansion Fund
+  try { data.expansionFund = {ok:true, records: rowsToObjs(rd('ExpansionFund'))}; } catch(e) { data.expansionFund = {ok:false,error:e.message}; }
+
+  // 30. Investor Distributions
+  try { data.investorDistributions = {ok:true, records: rowsToObjs(rd('InvestorDistributions'))}; } catch(e) { data.investorDistributions = {ok:false,error:e.message}; }
+
+  // 31. Portal Config (key-JSON)
+  try {
+    var pcRows = rd('PortalConfig');
+    var config = {};
+    for (var pi = 1; pi < pcRows.length; pi++) { var pk=String(pcRows[pi][0]||''),pv=String(pcRows[pi][1]||''); if(pk){try{config[pk]=JSON.parse(pv);}catch(e2){config[pk]=pv;}} }
+    data.portalConfig = {ok:true, config:config};
+  } catch(e) { data.portalConfig = {ok:false,error:e.message}; }
+
+  // 32. Daily Expenses (date-JSON)
+  try {
+    var deRows = rd('DailyExpenses');
+    var dexp = {};
+    for (var di = 1; di < deRows.length; di++) { var dd=String(deRows[di][0]||''),dj=String(deRows[di][1]||'[]'); if(dd){try{dexp[dd]=JSON.parse(dj);}catch(e2){dexp[dd]=[];}} }
+    data.dailyExpenses = {ok:true, expenses:dexp};
+  } catch(e) { data.dailyExpenses = {ok:false,error:e.message}; }
+
+  // 33. Service Areas (list)
+  try {
+    var saRows = rd('ServiceAreas');
+    var areas = [];
+    for (var si2 = 1; si2 < saRows.length; si2++) { var nm=String(saRows[si2][0]||''); if(nm) areas.push(nm); }
+    data.serviceAreas = {ok:true, areas:areas};
+  } catch(e) { data.serviceAreas = {ok:false,error:e.message}; }
+
+  // 34. Area Schedule (key-JSON)
+  try {
+    var asRows = rd('AreaSchedule');
+    var schedule = {};
+    for (var asi = 1; asi < asRows.length; asi++) { var ar=String(asRows[asi][0]||''),adj=String(asRows[asi][1]||'[]'); if(ar){try{schedule[ar]=JSON.parse(adj);}catch(e2){schedule[ar]=[];}} }
+    data.areaSchedule = {ok:true, schedule:schedule};
+  } catch(e) { data.areaSchedule = {ok:false,error:e.message}; }
+
+  // 35. OPEX Categories (list)
+  try {
+    var oxRows = rd('OpexCategories');
+    var cats = [];
+    for (var oi = 1; oi < oxRows.length; oi++) { var cn=String(oxRows[oi][0]||''); if(cn) cats.push(cn); }
+    data.opexCategories = {ok:true, categories:cats};
+  } catch(e) { data.opexCategories = {ok:false,error:e.message}; }
+
+  return { ok: true, data: data };
 }
 
