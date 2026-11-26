@@ -11739,7 +11739,16 @@ function _processBulkAccounts(res) { if (res) _applySheetAccounts(res); }
 function _processBulkClients(clData) {
   if (!clData || !clData.ok || !clData.clients) return;
   var sheetClientIds = new Set();
-  clData.clients.forEach(function(c) { var id=c.clientId||c.id; if(!id) return; c.id=id; sheetClientIds.add(id); if(!CLIENTS[id]){c._synced=true;CLIENTS[id]=c;}else{CLIENTS[id]._synced=true;} });
+  clData.clients.forEach(function(c) {
+    var id=c.clientId||c.id; if(!id) return; c.id=id; sheetClientIds.add(id);
+    if(!CLIENTS[id]){ c._synced=true; CLIENTS[id]=c; }
+    else {
+      // Merge Sheets data INTO existing — Sheets wins for all fields except local-only ones
+      var local=CLIENTS[id];
+      Object.keys(c).forEach(function(k){ if(k!=='_dirty'&&k!=='_synced'&&c[k]) local[k]=c[k]; });
+      local._synced=true;
+    }
+  });
   Object.keys(CLIENTS).forEach(function(k) { if(CLIENTS[k]&&CLIENTS[k]._synced&&!sheetClientIds.has(k)) delete CLIENTS[k]; });
 }
 function _processBulkComplaints(cmpData) {
