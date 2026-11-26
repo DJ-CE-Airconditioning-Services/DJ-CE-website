@@ -1406,13 +1406,20 @@ function _migrateBudgetCategories(){
       migrated = true;
     }
   });
+  // Also clean up stale localStorage OPEX entries (old "Household — Shop Rent" etc)
+  var staleKeys = ['Household — Shop Rent','Household — Shop E.Bill','Household — Shop Wifi','Household — Service Maintenance','Household — Tools Subscription','Household — Salaries','Household — Sam Baon','Household — Other operations','Household — Operation Materials','Household — ADS Payments'];
+  staleKeys.forEach(function(sk){
+    var idx = OPEX_CATEGORIES.indexOf(sk);
+    if(idx>-1){ OPEX_CATEGORIES.splice(idx,1); migrated=true; }
+  });
   if(migrated){
     try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){}
     try{localStorage.setItem('djce_business_budgets',JSON.stringify(BUSINESS_BUDGETS));}catch(e){}
     saveLocalData();
     syncHouseholdToOpex();
     syncBusinessToOpex();
-    console.log('Budget categories migrated: shop items moved to Business');
+    saveOpexToLocal();
+    console.log('Budget categories migrated: shop items moved to Business, stale OPEX entries cleaned');
   }
   _budgetMigrationDone = true;
 }
@@ -7468,7 +7475,7 @@ function buildRevenueContent(from, to) {
     <div class="panel-head">
       <div class="panel-title">💸 Expenses (OPEX)</div>
       <div style="display:flex;gap:7px">
-        <button class="btn btn-outline btn-xs" onclick="addHouseholdCategory()">➕ Add Category</button>
+        <button class="btn btn-outline btn-xs" onclick="openAddOpexCategory()">➕ Add Category</button>
         <button class="btn btn-gold btn-sm" onclick="openAddExpense()">➕ Add Expense</button>
       </div>
     </div>
@@ -8044,26 +8051,41 @@ function saveNewBudgetCategory(type){
 }
 
 function addHouseholdCategory(){ addBudgetCategory('household'); }
+function openAddOpexCategory(){
+  document.getElementById('expModalTitle').textContent = '➕ Add Expense Category';
+  var subEl = document.querySelector('#expenseModal .modal-sub');
+  if(subEl) subEl.textContent = 'Choose where to add the category';
+  document.getElementById('expModalBody').innerHTML = '<div class="form-grid">'
+    +'<div class="field"><label>Add to *</label><select id="hb_new_type" style="width:100%;padding:8px;background:var(--bg-dark);color:var(--text);border:1px solid var(--border);border-radius:6px"><option value="household">🏠 Household</option><option value="business">🏢 Shop / Operations</option></select></div>'
+    +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Shop Rent, Wifi, Groceries"></div>'
+    +'<div class="field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
+    +'</div>';
+  document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
+    +'<button class="btn btn-gold btn-sm" onclick="saveNewCategory()">💾 Save</button>';
+  openModal('expenseModal');
+}
 function saveNewCategory(){
   var catType = document.getElementById('hb_new_type')?.value||'household';
   var name = (document.getElementById('hb_new_name')?.value||'').trim();
   if(!name){ showToast('Enter a category name','error'); return; }
+  var budget = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
   if(catType==='household'){
     if(HOUSEHOLD_BUDGETS[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
-    HOUSEHOLD_BUDGETS[name] = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
+    HOUSEHOLD_BUDGETS[name] = budget;
     saveHouseholdBudgets();
     syncHouseholdToOpex();
+    saveOpexToLocal();
     closeModal('expenseModal');
     showToast('Added: Household — '+name,'success');
     refreshRevenue();
   } else {
-    // Operation category
-    if(OPEX_CATEGORIES.indexOf(name)!==-1){ showToast('"'+name+'" already exists','warning'); return; }
-    OPEX_CATEGORIES.push(name);
-    try { localStorage.setItem('djce_opex_categories', JSON.stringify(OPEX_CATEGORIES)); } catch(e){}
-    callSheets({action:'saveOpexCategories',data:encodeURIComponent(JSON.stringify({categories:OPEX_CATEGORIES}))}).catch(function(e){console.log('OPEX categories sync error:',e);});
+    if(BUSINESS_BUDGETS[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
+    BUSINESS_BUDGETS[name] = budget;
+    saveBusinessBudgets();
+    syncBusinessToOpex();
+    saveOpexToLocal();
     closeModal('expenseModal');
-    showToast('Added operation category: '+name,'success');
+    showToast('Added: Business — '+name,'success');
     refreshRevenue();
   }
 }
@@ -8083,6 +8105,9 @@ function removeHouseholdCat(cat){
   });
 }
 
+function saveOpexToLocal(){
+  try{localStorage.setItem('djce_opex_categories',JSON.stringify(OPEX_CATEGORIES));}catch(e){}
+}
 function syncHouseholdToOpex(){
   // Remove old Household — entries, re-add from HOUSEHOLD_BUDGETS
   var base = OPEX_CATEGORIES.filter(function(c){return c.indexOf('Household —')!==0;});
@@ -8095,6 +8120,7 @@ function syncHouseholdToOpex(){
   }
   OPEX_CATEGORIES.length = 0;
   base.forEach(function(c){OPEX_CATEGORIES.push(c);});
+  saveOpexToLocal();
 }
 function syncBusinessToOpex(){
   // Remove old Business — entries, re-add from BUSINESS_BUDGETS
@@ -8111,6 +8137,7 @@ function syncBusinessToOpex(){
   }
   OPEX_CATEGORIES.length = 0;
   base.forEach(function(c){OPEX_CATEGORIES.push(c);});
+  saveOpexToLocal();
 }
 function syncBusinessBudgetsToSheets(){
   callSheets({ action:'saveBusinessBudget', data:encodeURIComponent(JSON.stringify({ budgets: BUSINESS_BUDGETS })) })
