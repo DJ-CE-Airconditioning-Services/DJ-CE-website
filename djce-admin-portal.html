@@ -1389,6 +1389,35 @@ try { HOUSEHOLD_BUDGETS = JSON.parse(localStorage.getItem('djce_household_budget
 if(!HOUSEHOLD_BUDGETS || !Object.keys(HOUSEHOLD_BUDGETS).length){
   HOUSEHOLD_BUDGETS = { 'Food': 18000, 'Utilities': 5000, 'Transportation': 3000, 'Other': 2000 };
 }
+// Business/Operations budget config — stored in localStorage
+var BUSINESS_BUDGETS = {};
+try { BUSINESS_BUDGETS = JSON.parse(localStorage.getItem('djce_business_budgets')||'{}'); } catch(e){}
+// One-time migration: move shop/operation categories from Household to Business
+var _budgetMigrationDone = false;
+function _migrateBudgetCategories(){
+  if(_budgetMigrationDone) return;
+  var shopKeys = ['Shop Rent','Shop E.Bill','Shop Wifi','Service Maintenance','Tools Subscription','Salaries','Sam Baon','Other operations'];
+  var migrated = false;
+  shopKeys.forEach(function(k){
+    if(HOUSEHOLD_BUDGETS[k]!==undefined && BUSINESS_BUDGETS[k]===undefined){
+      BUSINESS_BUDGETS[k] = HOUSEHOLD_BUDGETS[k];
+      delete HOUSEHOLD_BUDGETS[k];
+      EXPENSES.forEach(function(e){ if(e.category==='Household — '+k) e.category='Business — '+k; });
+      migrated = true;
+    }
+  });
+  if(migrated){
+    try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){}
+    try{localStorage.setItem('djce_business_budgets',JSON.stringify(BUSINESS_BUDGETS));}catch(e){}
+    saveLocalData();
+    syncHouseholdToOpex();
+    syncBusinessToOpex();
+    console.log('Budget categories migrated: shop items moved to Business');
+  }
+  _budgetMigrationDone = true;
+}
+function saveBusinessBudgets(){ try{localStorage.setItem('djce_business_budgets',JSON.stringify(BUSINESS_BUDGETS));}catch(e){} syncBusinessBudgetsToSheets(); }
+function getBusinessCategories(){ return Object.keys(BUSINESS_BUDGETS); }
 function saveHouseholdBudgets(){ try{localStorage.setItem('djce_household_budgets',JSON.stringify(HOUSEHOLD_BUDGETS));}catch(e){} syncHouseholdBudgetsToSheets(); }
 function getHouseholdCategories(){ return Object.keys(HOUSEHOLD_BUDGETS); }
 const TEAM_RATES = {
@@ -7446,16 +7475,28 @@ function buildRevenueContent(from, to) {
     <div class="panel-body">${expTableHtml}</div>
   </div>
 
-  <!-- Household Budget Tracker -->
-  <div class="panel" style="margin-bottom:18px">
-    <div class="panel-head">
-      <div class="panel-title">🏠 Household Budget Tracker (This Month)</div>
-      <div style="display:flex;gap:7px">
-        <button class="btn btn-outline btn-xs" onclick="openHouseholdBudgetSettings()">⚙️ Set Budgets</button>
-        <button class="btn btn-outline btn-xs" onclick="addHouseholdCategory()">➕ Add Category</button>
+  <!-- Budget Tracker (Side by Side) -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:18px">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🏠 Household (This Month)</div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-outline btn-xs" onclick="openBudgetSettings('household')">⚙️</button>
+          <button class="btn btn-outline btn-xs" onclick="addBudgetCategory('household')">➕</button>
+        </div>
       </div>
+      <div class="panel-body">${buildBudgetColumn('household')}</div>
     </div>
-    <div class="panel-body">${buildHouseholdTracker()}</div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🏢 Shop / Operations (This Month)</div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-outline btn-xs" onclick="openBudgetSettings('business')">⚙️</button>
+          <button class="btn btn-outline btn-xs" onclick="addBudgetCategory('business')">➕</button>
+        </div>
+      </div>
+      <div class="panel-body">${buildBudgetColumn('business')}</div>
+    </div>
   </div>
 
   <!-- Daily Financial Audit -->
@@ -7811,7 +7852,7 @@ function deleteCalNote(dateStr) {
 
 /* ─── Household Budget Tracker ─────────────────── */
 
-function buildHouseholdTracker(){
+function buildBudgetColumn(type){
   var now = new Date();
   var yr = now.getFullYear(), mo = now.getMonth()+1;
   var mFrom = yr+'-'+String(mo).padStart(2,'0')+'-01';
@@ -7819,17 +7860,21 @@ function buildHouseholdTracker(){
   var mTo = yr+'-'+String(mo).padStart(2,'0')+'-'+String(lastDay);
   var moLabel = now.toLocaleString('default',{month:'long',year:'numeric'});
 
-  // Get household expenses this month
-  var houseExp = EXPENSES.filter(function(e){
-    return e.date && e.date>=mFrom && e.date<=mTo && (e.category||'').indexOf('Household')===0;
+  var isHouse = type==='household';
+  var prefix = isHouse ? 'Household' : 'Business';
+  var budgets = isHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var cats = Object.keys(budgets);
+  var icon = isHouse ? '🏠' : '🏢';
+
+  // Get expenses this month matching prefix
+  var monthExp = EXPENSES.filter(function(e){
+    return e.date && e.date>=mFrom && e.date<=mTo && (e.category||'').indexOf(prefix+' —')===0;
   });
 
-  // Group by subcategory
-  var cats = getHouseholdCategories();
   var rows = cats.map(function(cat){
-    var catKey = 'Household — '+cat;
-    var spent = houseExp.filter(function(e){return e.category===catKey;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
-    var budget = parseFloat(HOUSEHOLD_BUDGETS[cat])||0;
+    var catKey = prefix+' — '+cat;
+    var spent = monthExp.filter(function(e){return e.category===catKey;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+    var budget = parseFloat(budgets[cat])||0;
     var pct = budget>0 ? Math.round((spent/budget)*100) : 0;
     var over = spent > budget && budget > 0;
     return {cat:cat, catKey:catKey, spent:spent, budget:budget, pct:pct, over:over};
@@ -7839,79 +7884,164 @@ function buildHouseholdTracker(){
   var totalSpent = rows.reduce(function(s,r){return s+r.spent;},0);
   var totalPct = totalBudget>0 ? Math.round((totalSpent/totalBudget)*100) : 0;
 
-  if(!cats.length) return '<div class="empty" style="padding:14px"><div class="empty-ic">🏠</div>No household budget categories. Click "Add Category" to start.</div>';
+  if(!cats.length) return '<div class="empty" style="padding:14px"><div class="empty-ic">'+icon+'</div>No categories yet. Click ➕ to add.</div>';
 
-  var html = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">'+moLabel+' — Track household spending vs monthly budget. Over-budget items turn red.</div>';
+  var html = '<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">'+moLabel+'</div>';
   html += rows.map(function(r){
     var barColor = r.over ? 'var(--danger)' : (r.pct>80 ? 'var(--warning)' : 'var(--success)');
     var barWidth = Math.min(r.pct, 100);
     return '<div style="margin-bottom:10px">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
       +'<span style="font-size:12.5px;font-weight:600">'+r.cat+'</span>'
-      +'<span style="font-size:12px;'+(r.over?'color:var(--danger);font-weight:700':'color:var(--text-dim)')+'">₱'+r.spent.toLocaleString()+' / ₱'+r.budget.toLocaleString()+' ('+r.pct+'%)'+(r.over?' ⚠️ OVER':'')+'</span>'
+      +'<span style="font-size:11px;'+(r.over?'color:var(--danger);font-weight:700':'color:var(--text-dim)')+'">₱'+r.spent.toLocaleString()+' / ₱'+r.budget.toLocaleString()+' ('+r.pct+'%)'+(r.over?' ⚠️':'')+'</span>'
       +'</div>'
       +'<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">'
       +'<div style="height:100%;width:'+barWidth+'%;background:'+barColor+';border-radius:4px;transition:width .3s"></div>'
       +'</div></div>';
   }).join('');
 
-  // Total row
   var totalColor = totalSpent>totalBudget ? 'var(--danger)' : 'var(--success)';
   html += '<div style="margin-top:12px;padding:10px 12px;background:var(--bg-elev2);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
-    +'<span style="font-weight:700;font-size:13px">📊 Total Household</span>'
-    +'<span style="font-size:14px;font-weight:800;color:'+totalColor+'">₱'+totalSpent.toLocaleString()+' / ₱'+totalBudget.toLocaleString()+' ('+totalPct+'%)</span>'
+    +'<span style="font-weight:700;font-size:12px">'+icon+' Total</span>'
+    +'<span style="font-size:13px;font-weight:800;color:'+totalColor+'">₱'+totalSpent.toLocaleString()+' / ₱'+totalBudget.toLocaleString()+' ('+totalPct+'%)</span>'
     +'</div>';
 
   return html;
 }
 
-function openHouseholdBudgetSettings(){
-  var cats = getHouseholdCategories();
+// Keep old function name working (backward compat)
+function buildHouseholdTracker(){ return buildBudgetColumn('household'); }
+
+function openHouseholdBudgetSettings(){ openBudgetSettings('household'); }
+
+function openBudgetSettings(type){
+  var isHouse = type==='household';
+  var budgets = isHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var cats = Object.keys(budgets);
+  var icon = isHouse ? '🏠' : '🏢';
+  var label = isHouse ? 'Household' : 'Shop / Operations';
+  var otherLabel = isHouse ? 'Shop/Operations' : 'Household';
   var fieldsHtml = cats.map(function(cat){
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-      +'<span style="flex:1;font-size:13px;font-weight:600">'+cat+'</span>'
-      +'<input type="number" class="hb_input" data-cat="'+cat+'" value="'+(HOUSEHOLD_BUDGETS[cat]||0)+'" style="width:120px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" placeholder="₱ Budget">'
-      +'<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeHouseholdCat(\''+cat+'\')">🗑️</button>'
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+      +'<input class="bs_name" data-cat="'+escH(cat)+'" data-type="'+type+'" value="'+escH(cat)+'" style="flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;font-weight:600">'
+      +'<input type="number" class="bs_budget" data-cat="'+escH(cat)+'" data-type="'+type+'" value="'+(budgets[cat]||0)+'" style="width:100px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" placeholder="₱">'
+      +'<button class="btn btn-outline btn-xs" title="Move to '+otherLabel+'" onclick="moveBudgetCat(\''+escH(cat).replace(/'/g,"\\'")+'\',\''+type+'\')">↔️</button>'
+      +'<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeBudgetCat(\''+escH(cat).replace(/'/g,"\\'")+'\',\''+type+'\')">🗑️</button>'
       +'</div>';
   }).join('');
-  document.getElementById('expModalTitle').textContent = '🏠 Household Budget Settings';
-  document.getElementById('expModalBody').innerHTML = '<div style="margin-bottom:12px;font-size:12.5px;color:var(--text-dim)">Set monthly budget per household category (₱/month)</div>'+fieldsHtml;
+  if(!cats.length) fieldsHtml='<div style="font-size:12px;color:var(--text-dim);padding:8px">No categories. Click ➕ Add Category to start.</div>';
+  document.getElementById('expModalTitle').textContent = icon+' '+label+' Budget Settings';
+  document.getElementById('expModalBody').innerHTML = '<div style="margin-bottom:12px;font-size:12.5px;color:var(--text-dim)">Edit names, set budget (₱/month), or move categories. ↔️ moves to '+otherLabel+'.</div>'+fieldsHtml;
   document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
-    +'<button class="btn btn-gold btn-sm" onclick="saveHouseholdBudgetSettings()">💾 Save</button>';
+    +'<button class="btn btn-gold btn-sm" onclick="saveBudgetSettings(\''+type+'\')">💾 Save</button>';
   openModal('expenseModal');
 }
 
-function saveHouseholdBudgetSettings(){
-  var inputs = document.querySelectorAll('.hb_input');
-  inputs.forEach(function(inp){
-    var cat = inp.getAttribute('data-cat');
-    HOUSEHOLD_BUDGETS[cat] = parseFloat(inp.value)||0;
+function saveBudgetSettings(type){
+  var isHouse = type==='household';
+  var budgets = isHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var nameInputs = document.querySelectorAll('.bs_name[data-type="'+type+'"]');
+  var budgetInputs = document.querySelectorAll('.bs_budget[data-type="'+type+'"]');
+  var newBudgets = {};
+  nameInputs.forEach(function(inp,i){
+    var oldCat = inp.getAttribute('data-cat');
+    var newName = (inp.value||'').trim();
+    if(!newName) return;
+    var budgetVal = budgetInputs[i] ? parseFloat(budgetInputs[i].value)||0 : (budgets[oldCat]||0);
+    newBudgets[newName] = budgetVal;
+    // If renamed, update existing expenses
+    if(newName!==oldCat){
+      var prefix = isHouse ? 'Household' : 'Business';
+      var oldKey = prefix+' — '+oldCat;
+      var newKey = prefix+' — '+newName;
+      EXPENSES.forEach(function(e){ if(e.category===oldKey) e.category=newKey; });
+      // Update OPEX_CATEGORIES
+      var idx = OPEX_CATEGORIES.indexOf(oldKey);
+      if(idx>-1) OPEX_CATEGORIES[idx]=newKey;
+    }
   });
-  saveHouseholdBudgets();
-  // Also update OPEX_CATEGORIES to include any new household cats
+  if(isHouse){ HOUSEHOLD_BUDGETS=newBudgets; window.HOUSEHOLD_BUDGETS=newBudgets; saveHouseholdBudgets(); }
+  else { BUSINESS_BUDGETS=newBudgets; window.BUSINESS_BUDGETS=newBudgets; saveBusinessBudgets(); }
   syncHouseholdToOpex();
+  syncBusinessToOpex();
+  saveLocalData();
   closeModal('expenseModal');
-  showToast('Household budgets saved ✅','success');
+  showToast('Budget settings saved ✅','success');
   refreshRevenue();
 }
 
-function addHouseholdCategory(){
-  document.getElementById('expModalTitle').textContent = '➕ Add Category';
+function moveBudgetCat(cat, fromType){
+  var isFromHouse = fromType==='household';
+  var fromBudgets = isFromHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var toBudgets = isFromHouse ? BUSINESS_BUDGETS : HOUSEHOLD_BUDGETS;
+  var fromPrefix = isFromHouse ? 'Household' : 'Business';
+  var toPrefix = isFromHouse ? 'Business' : 'Household';
+  var budget = fromBudgets[cat]||0;
+  // Move budget entry
+  toBudgets[cat] = budget;
+  delete fromBudgets[cat];
+  // Update expense categories
+  var oldKey = fromPrefix+' — '+cat;
+  var newKey = toPrefix+' — '+cat;
+  EXPENSES.forEach(function(e){ if(e.category===oldKey) e.category=newKey; });
+  if(isFromHouse){ saveHouseholdBudgets(); saveBusinessBudgets(); }
+  else { saveBusinessBudgets(); saveHouseholdBudgets(); }
+  syncHouseholdToOpex();
+  syncBusinessToOpex();
+  saveLocalData();
+  showToast(cat+' → moved to '+(isFromHouse?'Shop/Operations':'Household'),'success');
+  closeModal('expenseModal');
+  refreshRevenue();
+}
+
+function removeBudgetCat(cat, type){
+  var isHouse = type==='household';
+  var budgets = isHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var prefix = isHouse ? 'Household' : 'Business';
+  confirm2('Remove Category', 'Remove "'+cat+'" from budget tracker?<br>Existing expenses under this category will keep their data.', '🗑️', function(){
+    delete budgets[cat];
+    var catKey = prefix+' — '+cat;
+    var idx = OPEX_CATEGORIES.indexOf(catKey);
+    if(idx>-1) OPEX_CATEGORIES.splice(idx,1);
+    if(isHouse) saveHouseholdBudgets(); else saveBusinessBudgets();
+    closeModal('expenseModal');
+    showToast(cat+' removed','success');
+    refreshRevenue();
+  });
+}
+
+function saveHouseholdBudgetSettings(){ saveBudgetSettings('household'); }
+
+function addBudgetCategory(type){
+  var isHouse = type==='household';
+  var label = isHouse ? 'Household' : 'Shop / Operations';
+  document.getElementById('expModalTitle').textContent = '➕ Add '+label+' Category';
   document.getElementById('expModalBody').innerHTML = '<div class="form-grid">'
-    +'<div class="field"><label>Type *</label>'
-    +'<select id="hb_new_type"><option value="operation">Operation (OPEX)</option><option value="household">Household</option></select></div>'
-    +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Groceries, Maintenance"></div>'
-    +'<div class="field" id="hb_budget_field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
+    +'<div class="field"><label>Category Name *</label><input id="hb_new_name" placeholder="e.g. Shop Rent, Wifi, Groceries"></div>'
+    +'<div class="field"><label>Monthly Budget (₱)</label><input type="number" id="hb_new_budget" placeholder="0" min="0"></div>'
     +'</div>';
   document.getElementById('expModalFoot').innerHTML = '<button class="btn btn-outline btn-sm" onclick="closeModal(\'expenseModal\')">Cancel</button>'
-    +'<button class="btn btn-gold btn-sm" onclick="saveNewCategory()">💾 Save</button>';
-  // Show/hide budget field based on type
-  var typeSelect = document.getElementById('hb_new_type');
-  var budgetField = document.getElementById('hb_budget_field');
-  typeSelect.addEventListener('change', function(){ budgetField.style.display = this.value==='household'?'':'none'; });
-  budgetField.style.display = typeSelect.value==='household'?'':'none';
+    +'<button class="btn btn-gold btn-sm" onclick="saveNewBudgetCategory(\''+type+'\')">💾 Save</button>';
   openModal('expenseModal');
 }
+
+function saveNewBudgetCategory(type){
+  var name = (document.getElementById('hb_new_name')?.value||'').trim();
+  if(!name){ showToast('Enter a category name','error'); return; }
+  var budget = parseFloat(document.getElementById('hb_new_budget')?.value)||0;
+  var isHouse = type==='household';
+  var budgets = isHouse ? HOUSEHOLD_BUDGETS : BUSINESS_BUDGETS;
+  var prefix = isHouse ? 'Household' : 'Business';
+  if(budgets[name]!==undefined){ showToast('"'+name+'" already exists','warning'); return; }
+  budgets[name] = budget;
+  if(isHouse) saveHouseholdBudgets(); else saveBusinessBudgets();
+  if(isHouse) syncHouseholdToOpex(); else syncBusinessToOpex();
+  closeModal('expenseModal');
+  showToast('Added: '+prefix+' — '+name,'success');
+  refreshRevenue();
+}
+
+function addHouseholdCategory(){ addBudgetCategory('household'); }
 function saveNewCategory(){
   var catType = document.getElementById('hb_new_type')?.value||'household';
   var name = (document.getElementById('hb_new_name')?.value||'').trim();
@@ -7957,14 +8087,33 @@ function syncHouseholdToOpex(){
   var otherIdx = base.indexOf('Other');
   var houseCats = getHouseholdCategories().map(function(c){return 'Household — '+c;});
   if(otherIdx>-1){
-    // Insert before 'Other'
     base.splice.apply(base, [otherIdx, 0].concat(houseCats));
   } else {
     base = base.concat(houseCats);
   }
-  // Update in place
   OPEX_CATEGORIES.length = 0;
   base.forEach(function(c){OPEX_CATEGORIES.push(c);});
+}
+function syncBusinessToOpex(){
+  // Remove old Business — entries, re-add from BUSINESS_BUDGETS
+  var base = OPEX_CATEGORIES.filter(function(c){return c.indexOf('Business —')!==0;});
+  var bizCats = getBusinessCategories().map(function(c){return 'Business — '+c;});
+  // Insert business cats after Warranty (before Household entries)
+  var firstHouseIdx = base.findIndex(function(c){return c.indexOf('Household —')===0;});
+  if(firstHouseIdx>-1){
+    base.splice.apply(base, [firstHouseIdx, 0].concat(bizCats));
+  } else {
+    var otherIdx = base.indexOf('Other');
+    if(otherIdx>-1) base.splice.apply(base, [otherIdx, 0].concat(bizCats));
+    else base = base.concat(bizCats);
+  }
+  OPEX_CATEGORIES.length = 0;
+  base.forEach(function(c){OPEX_CATEGORIES.push(c);});
+}
+function syncBusinessBudgetsToSheets(){
+  callSheets({ action:'saveBusinessBudget', data:encodeURIComponent(JSON.stringify({ budgets: BUSINESS_BUDGETS })) })
+    .then(function(res){ if(res&&res.ok) console.log('Business budgets synced to Sheets'); })
+    .catch(function(){});
 }
 
 /* ─── Payslip Generator ───────────────────────── */
@@ -11585,6 +11734,8 @@ function loadLocalData() {
   try { BLACKLIST = JSON.parse(localStorage.getItem('djce_blacklist')||'[]'); } catch(e) { BLACKLIST=[]; }
   try { WAITLIST = JSON.parse(localStorage.getItem('djce_waitlist')||'[]'); } catch(e) { WAITLIST=[]; }
   try { CALENDAR_NOTES = JSON.parse(localStorage.getItem('djce_calendar_notes')||'{}'); } catch(e) { CALENDAR_NOTES={}; }
+  _migrateBudgetCategories();
+  syncBusinessToOpex();
   autoPurgeTrash();
 }
 
