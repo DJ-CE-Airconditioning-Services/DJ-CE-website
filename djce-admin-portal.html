@@ -2180,8 +2180,10 @@ function renderDashboard() {
   const alerts = [];
   if (unassigned.length) alerts.push({type:'warning', msg:`${unassigned.length} booking${unassigned.length!==1?'s':''} unassigned — needs technician`, action:"switchView('jobs')"});
   if (backjob.length)    alerts.push({type:'danger',  msg:`${backjob.length} job${backjob.length!==1?'s':''} for backjob — follow up needed`, action:"switchJobTab('backjob');switchView('jobs')"});
-  const overdueClients = Object.values(CLIENTS).filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now);
-  if (overdueClients.length) alerts.push({type:'danger', msg:`${overdueClients.length} client${overdueClients.length!==1?'s':''} overdue for cleaning — tawagan na!`, action:"switchView('clients')"});
+  const overdueClients = Object.values(CLIENTS).filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now&&!c.followUpStatus);
+  const followUpClients = Object.values(CLIENTS).filter(c=>c.followUpStatus==='followup');
+  if (overdueClients.length) alerts.push({type:'danger', msg:`${overdueClients.length} client${overdueClients.length!==1?'s':''} overdue for cleaning — tawagan na!`, action:"switchView('clients');document.getElementById('clFilter').value='overdue';filterClientsView('')"});
+  if (followUpClients.length) alerts.push({type:'warning', msg:`${followUpClients.length} client${followUpClients.length!==1?'s':''} need follow-up contact`, action:"switchView('clients');document.getElementById('clFilter').value='followup';filterClientsView('')"});
   const dueClients = getDueClients().filter(c=>{var d=(new Date(c.nextCleaningDate)-now)/(1000*60*60*24);return d>=0;});
   if (dueClients.length) alerts.push({type:'warning', msg:`${dueClients.length} client${dueClients.length!==1?'s':''} due for service within ${SERVICE_SETTINGS.warningDays} days`, action:"switchView('clients')"});
   const openComplaints = COMPLAINTS.filter(c=>c.status==='Open');
@@ -4590,6 +4592,11 @@ function renderClients() {
           <option value="overdue">🔴 Overdue for Cleaning</option>
           <option value="due">🔴 Due Soon (within warning window)</option>
           <option value="ok">✅ On Track</option>
+          <option value="contacted">📲 Contacted</option>
+          <option value="followup">🔁 Follow-up</option>
+          <option value="noresponse">❌ No Response</option>
+          <option value="declined">⏸️ Declined</option>
+          <option value="repaironly">🔧 Repair Only</option>
           <option value="blacklisted">🚫 Blacklisted</option>
           <optgroup label="── By Service Type ──">
           ${SERVICES.map(s=>'<option value="svc:'+s+'">🔧 '+s+'</option>').join('')}
@@ -4612,8 +4619,17 @@ function renderClientRows(clients) {
     var next = c.nextCleaningDate ? new Date(c.nextCleaningDate) : null;
     var diff = next ? (next - now)/(1000*60*60*24) : 999;
     var warn = SERVICE_SETTINGS.warningDays||14;
-    var sCls = !next ? 's-confirmed' : diff < 0 ? 's-cancelled' : diff <= warn ? 's-cancelled' : 's-done';
-    var sLbl = !next ? 'No date' : diff < 0 ? '🔴 Overdue' : diff <= warn ? '🔴 Due '+formatDate(c.nextCleaningDate) : '🟢 On track';
+    var fs = c.followUpStatus||'';
+    var sCls, sLbl;
+    if(fs==='contacted'){ sCls='s-confirmed'; sLbl='📲 Contacted'; }
+    else if(fs==='followup'){ sCls='s-pending'; sLbl='🔁 Follow-up'; }
+    else if(fs==='noresponse'){ sCls='s-confirmed'; sLbl='❌ No Response'; }
+    else if(fs==='declined'){ sCls='s-confirmed'; sLbl='⏸️ Declined'; }
+    else if(fs==='repaironly'){ sCls='s-confirmed'; sLbl='🔧 Repair Only'; }
+    else {
+      sCls = !next ? 's-confirmed' : diff < 0 ? 's-cancelled' : diff <= warn ? 's-cancelled' : 's-done';
+      sLbl = !next ? 'No date' : diff < 0 ? '🔴 Overdue' : diff <= warn ? '🔴 Due '+formatDate(c.nextCleaningDate) : '🟢 On track';
+    }
     var bl = isBlacklisted(c.name, c.phone);
     var eName = escH(c.name||'').replace(/'/g,'&#39;');
     var ePhone = escH(c.phone||'').replace(/'/g,'&#39;');
@@ -4627,8 +4643,14 @@ function renderClientRows(clients) {
         blBtn = '<button class="btn btn-outline btn-xs" style="color:var(--danger);border-color:var(--danger)" onclick="event.stopPropagation();openBlacklistModal(\''+eName+'\',\''+ePhone+'\',\''+eId+'\')" title="Blacklist">🚫</button>';
       }
     }
+    var fuBtn = '';
+    if(diff<0 && !fs) {
+      fuBtn = '<button class="btn btn-outline btn-xs" style="color:var(--gold);border-color:var(--gold);font-size:10px" onclick="event.stopPropagation();openFollowUpMenu(\''+eId+'\')" title="Set Follow-Up Status">📋</button>';
+    } else if(fs) {
+      fuBtn = '<button class="btn btn-outline btn-xs" style="font-size:10px" onclick="event.stopPropagation();openFollowUpMenu(\''+eId+'\')" title="Change Follow-Up Status">📋</button>';
+    }
     var adminBtns = (session.role==='owner'||session.role==='admin') ?
-      blBtn +
+      fuBtn + blBtn +
       '<button class="btn btn-outline btn-xs" onclick="archiveClient(\''+eId+'\',\''+eName+'\')" title="Archive">📦</button>' +
       '<button class="btn btn-danger btn-xs" onclick="deleteClient(\''+eId+'\',\''+eName+'\')" title="Delete">🗑️</button>' : '';
     return '<tr'+(bl?' style="background:rgba(220,38,38,0.06)"':'')+'>' +
@@ -4648,14 +4670,56 @@ function renderClientRows(clients) {
   }).join('');
 }
 
+function openFollowUpMenu(clientId) {
+  var c=CLIENTS[clientId]; if(!c) return;
+  var cur=c.followUpStatus||'';
+  var opts=[
+    {val:'',lbl:'🔄 Reset to Auto',desc:'Back to normal overdue tracking'},
+    {val:'contacted',lbl:'📲 Contacted',desc:'Messaged/called, waiting for reply'},
+    {val:'followup',lbl:'🔁 Follow-up',desc:'Need to contact again'},
+    {val:'noresponse',lbl:'❌ No Response',desc:'Multiple attempts, no reply'},
+    {val:'declined',lbl:'⏸️ Declined',desc:'Client doesn\'t want service yet'},
+    {val:'repaironly',lbl:'🔧 Repair Only',desc:'One-time repair, no recurring schedule'}
+  ];
+  var html='<div style="display:flex;flex-direction:column;gap:8px">';
+  opts.forEach(function(o){
+    var sel=cur===o.val;
+    html+='<button class="btn '+(sel?'btn-gold':'btn-outline')+' btn-sm" style="text-align:left;padding:10px 14px" onclick="setFollowUpStatus(\''+clientId+'\',\''+o.val+'\')">'+
+      '<div style="font-weight:600">'+o.lbl+(sel?' ✓':'')+'</div>'+
+      '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">'+o.desc+'</div></button>';
+  });
+  html+='</div>';
+  document.getElementById('emSub').textContent='Follow-Up Status — '+escH(c.name);
+  document.getElementById('emBody').innerHTML=html;
+  document.getElementById('emFoot').innerHTML='<button class="btn btn-outline btn-sm" onclick="closeModal(\'editModal\')">Close</button>';
+  openModal('editModal');
+}
+
+function setFollowUpStatus(clientId, status) {
+  var c=CLIENTS[clientId]; if(!c) return;
+  c.followUpStatus=status;
+  saveLocalData();
+  syncClientToSheets(c);
+  closeModal('editModal');
+  var statusLabels={'':'normal','contacted':'Contacted','followup':'Follow-up','noresponse':'No Response','declined':'Declined','repaironly':'Repair Only'};
+  showToast(escH(c.name)+' → '+(statusLabels[status]||'Normal'),'success');
+  logActivity('📋','Follow-up status: '+c.name+' → '+(statusLabels[status]||'Normal'),'client');
+  switchView('clients');
+}
+
 function filterClientsView(q) {
   const filter = document.getElementById('clFilter')?.value||'';
   let clients = mergeClients();
   if (q) clients = clients.filter(c=>(c.name+c.phone+c.address).toLowerCase().includes(q.toLowerCase()));
   const now = new Date();
-  if (filter==='overdue') clients = clients.filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now);
-  else if (filter==='due') clients = clients.filter(c=>{if(!c.nextCleaningDate)return false;const d=new Date(c.nextCleaningDate);const diff=(d-now)/(1000*60*60*24);return diff>=0&&diff<=(SERVICE_SETTINGS.warningDays||14);});
-  else if (filter==='ok') clients = clients.filter(c=>{if(!c.nextCleaningDate)return true;return(new Date(c.nextCleaningDate)-now)/(1000*60*60*24)>(SERVICE_SETTINGS.warningDays||14);});
+  if (filter==='overdue') clients = clients.filter(c=>c.nextCleaningDate&&new Date(c.nextCleaningDate)<now&&!c.followUpStatus);
+  else if (filter==='due') clients = clients.filter(c=>{if(!c.nextCleaningDate)return false;const d=new Date(c.nextCleaningDate);const diff=(d-now)/(1000*60*60*24);return diff>=0&&diff<=(SERVICE_SETTINGS.warningDays||14)&&!c.followUpStatus;});
+  else if (filter==='ok') clients = clients.filter(c=>{if(c.followUpStatus)return false;if(!c.nextCleaningDate)return true;return(new Date(c.nextCleaningDate)-now)/(1000*60*60*24)>(SERVICE_SETTINGS.warningDays||14);});
+  else if (filter==='contacted') clients = clients.filter(c=>c.followUpStatus==='contacted');
+  else if (filter==='followup') clients = clients.filter(c=>c.followUpStatus==='followup');
+  else if (filter==='noresponse') clients = clients.filter(c=>c.followUpStatus==='noresponse');
+  else if (filter==='declined') clients = clients.filter(c=>c.followUpStatus==='declined');
+  else if (filter==='repaironly') clients = clients.filter(c=>c.followUpStatus==='repaironly');
   else if (filter==='blacklisted') clients = clients.filter(c=>isBlacklisted(c.name,c.phone));
   else if (filter.startsWith('svc:')) { const svc=filter.slice(4); clients = clients.filter(c=>(c.lastService||'').toLowerCase().includes(svc.toLowerCase())); }
   const tb=document.getElementById('clTBody');
@@ -12396,6 +12460,7 @@ function getDueClients(){
   const warn=SERVICE_SETTINGS.warningDays||14;
   return mergeClients().filter(c=>{
     if(!c.nextCleaningDate)return false;
+    if(c.followUpStatus&&c.followUpStatus!=='followup')return false;
     const diff=(new Date(c.nextCleaningDate)-today)/(1000*60*60*24);
     return diff<=warn;
   }).sort((a,b)=>new Date(a.nextCleaningDate)-new Date(b.nextCleaningDate));
@@ -13137,6 +13202,13 @@ function editClientModal(id){
     '<div class="form-grid" style="margin-top:10px">'+
     '<div class="field"><label>📅 Last Service Date</label><input type="date" id="ec_lastDate" value="'+(c.lastServiceDate||'')+'"></div>'+
     '<div class="field"><label>📅 Next Cleaning Date</label><input type="date" id="ec_nextDate" value="'+(c.nextCleaningDate||'')+'"></div>'+
+    '<div class="field"><label>📋 Follow-Up Status</label><select id="ec_followUpStatus"><option value="">— Normal (auto) —</option>'+
+    '<option value="contacted"'+(c.followUpStatus==='contacted'?' selected':'')+'>📲 Contacted</option>'+
+    '<option value="followup"'+(c.followUpStatus==='followup'?' selected':'')+'>🔁 Follow-up</option>'+
+    '<option value="noresponse"'+(c.followUpStatus==='noresponse'?' selected':'')+'>❌ No Response</option>'+
+    '<option value="declined"'+(c.followUpStatus==='declined'?' selected':'')+'>⏸️ Declined</option>'+
+    '<option value="repaironly"'+(c.followUpStatus==='repaironly'?' selected':'')+'>🔧 Repair Only</option>'+
+    '</select></div>'+
     '<div class="field"><label>AC Usage Frequency</label><select id="ec_usage"><option value="">— Select —</option>'+
     USAGE_OPTS.map(function(u){return '<option'+(c.usage===u.label?' selected':'')+'>'+u.label+'</option>';}).join('')+
     '</select></div>'+
@@ -13189,6 +13261,7 @@ function saveEditClient(){
     var existId=Object.keys(CLIENTS).find(function(k){return CLIENTS[k].phone===phone;});
     if(existId) id=existId; else { id='CL-'+Date.now(); source='manual'; }
   }
+  var followUpStatus=document.getElementById('ec_followUpStatus')?.value||'';
   CLIENTS[id]={
     id:id, name:name, phone:phone,
     email:document.getElementById('ec_email')?.value||'',
@@ -13202,6 +13275,7 @@ function saveEditClient(){
     notes:getNotesContent('ec_notes'),
     locationInfo:getLocationInfo('ec'),
     nextCleaningDate:ecNextDate||earliestNext||CLIENTS[id]?.nextCleaningDate||'',
+    followUpStatus:followUpStatus,
     source:source, createdAt:CLIENTS[id]?.createdAt||new Date().toISOString()
   };
   // Sync client details → matching bookings (by phone or old name)

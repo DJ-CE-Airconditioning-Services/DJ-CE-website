@@ -220,7 +220,7 @@ var HEADERS = {
   Clients: [
     'Client ID','Name','Phone','Email','Address','Landmark',
     'Last Service','Last Service Date','Last Cleaning Info','Usage Frequency',
-    'Next Cleaning Date','Notes','Location Info','Source','Created At'
+    'Next Cleaning Date','Follow Up Status','Notes','Location Info','Source','Created At'
   ],
   Complaints: [
     'Complaint ID','Title','Client Name','Booking ID','Type',
@@ -1074,7 +1074,7 @@ function saveClient(p) {
       var colMap = {};
       headers.forEach(function(h, idx) { colMap[headerToKey(h)] = idx + 1; });
       ['name','phone','email','address','landmark','lastService','lastServiceDate',
-       'lastCleaningInfo','usageFrequency','nextCleaningDate','notes','locationInfo','source'].forEach(function(k) {
+       'lastCleaningInfo','usageFrequency','nextCleaningDate','followUpStatus','notes','locationInfo','source'].forEach(function(k) {
         if (data[k] !== undefined) setCellByKey(sheet, i+1, colMap, k, data[k]);
       });
       return { ok: true, action: 'updated' };
@@ -1086,7 +1086,7 @@ function saveClient(p) {
     data.id||('CL-'+new Date().getTime()),
     data.name||'', data.phone||'', data.email||'', data.address||'', data.landmark||'',
     data.lastService||'', data.lastServiceDate||'', data.lastCleaningInfo||'', data.usageFrequency||data.usage||'',
-    data.nextCleaningDate||'', data.notes||'', locInfoStr, data.source||'manual', now()
+    data.nextCleaningDate||'', data.followUpStatus||'', data.notes||'', locInfoStr, data.source||'manual', now()
   ]);
   return { ok: true, action: 'created' };
 }
